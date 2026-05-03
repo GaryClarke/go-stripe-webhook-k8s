@@ -1,0 +1,96 @@
+# CI runs on every push to main. Jobs: compile check, tests, lint, Terraform plan.
+name: CI
+
+on:
+    push:
+        branches: [main]
+
+jobs:
+    # Quick compile check: does all Go code build? No artifact produced.
+    # Catches syntax errors and import problems. Runs in seconds.
+    build:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+
+            - uses: actions/setup-go@v5
+              with:
+                  go-version: "1.26"
+
+            - name: Build
+              run: go build ./...
+
+    # Run tests.
+    test:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+
+            - uses: actions/setup-go@v5
+              with:
+                  go-version: "1.26"
+
+            - name: Test
+              run: go test ./...
+
+    # Lint: go vet + golangci-lint (if installed). See Makefile.
+    lint:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+
+            - uses: actions/setup-go@v5
+              with:
+                  go-version: "1.26"
+
+            - name: Lint
+              run: make lint
+
+    # Terraform: validate config, check formatting, run plan against S3 state.
+    # Requires build/bootstrap.zip because our Lambda resource references it
+    # (filebase64sha256). So we run make build-ingest first.
+    terraform:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+
+            - uses: actions/setup-go@v5
+              with:
+                  go-version: "1.26"
+
+            - uses: hashicorp/setup-terraform@v3
+
+            # Terraform uses S3 backend; init needs AWS creds to fetch state.
+            - name: Configure AWS credentials
+              uses: aws-actions/configure-aws-credentials@v4
+              with:
+                  aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+                  aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+                  aws-region: eu-west-1
+
+            # Produces build/bootstrap.zip. Terraform reads this for the Lambda
+            # resource (filename + source_code_hash). Without it, plan fails.
+            # Different from "go build ./..." above: that only checks compile;
+            # this builds for Linux and zips for Lambda deploy.
+            - name: Build Lambda zip
+              run: make build-ingest
+
+            # Download providers, connect to S3 backend.
+            - name: Terraform init
+              run: terraform init
+              working-directory: terraform
+
+            # Check HCL syntax and block references.
+            - name: Terraform validate
+              run: terraform validate
+              working-directory: terraform
+
+            # Fail if .tf files are not formatted with terraform fmt.
+            - name: Terraform fmt
+              run: terraform fmt -check -recursive -diff
+              working-directory: terraform
+
+            # Show what would change. Reads state from S3; does not apply.
+            - name: Terraform plan
+              run: terraform plan -no-color -input=false
+              working-directory: terraform

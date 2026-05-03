@@ -1,0 +1,39 @@
+# Binaries
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+/bin/
+/dist/
+
+# Go
+*.test
+*.out
+go.work
+vendor/
+build
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Env
+.env
+.env.local
+*.local
+
+# Terraform (when added)
+.terraform/
+*.tfstate
+*.tfstate.*
+.terraform.lock.hcl
+
+# Lessons (personal learning notes, repeatable steps)
+lessons/
+
+# OS
+.DS_Store
+Thumbs.db

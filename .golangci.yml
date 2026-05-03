@@ -1,0 +1,21 @@
+# golangci-lint config for integration-engine
+# Run: golangci-lint run ./...
+# Install: https://golangci-lint.run/usage/install/
+
+run:
+  timeout: 2m
+  tests: true
+  modules-download-mode: readonly
+
+linters:
+  enable:
+    - errcheck
+    - gofmt
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+
+linters-settings:
+  govet:
+    enable-all: true
