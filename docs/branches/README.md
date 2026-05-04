@@ -1,18 +1,32 @@
-# Branch docs (index)
+# Branch docs (Kubernetes / HTTP service — index)
 
-Branch **numbers match git branch names** (e.g. `7-queue-abstraction`, `8-queue-from-config`) and **`docs/branches/NN-*.md`**. The **canonical roadmap** with Phase context is **[PROJECT_KNOWLEDGE.md §5](../PROJECT_KNOWLEDGE.md#5-build-order-branches)**.
+Work proceeds in **small, numbered git branches** that each map to **one unit of learning** and one **`NN-descriptive-name.md`** file in this folder.
 
-**Completed** branch docs are listed in the table below. **Proposed** branches **10–16** (Phase 1 remainder) and observability timing are spelled out in **§5 → “Proposed branches (Phase 1 remainder)”**—add a new `NN-*.md` here when each ships.
+- **Git branch names** use the same number and slug, e.g. `1-add-livez-and-readyz`.
+- **Learning roadmap and milestones:** see **[PLAN.md](../../PLAN.md)** (source of truth for what “Milestone 1”, etc. means).
+- **Lambda-era branch logs** (original project) live under **[docs/original-branches/](../original-branches/README.md)** — same idea, different phase of the repo.
 
-| Branch doc | Topic |
-|------------|--------|
-| [01-foundation.md](01-foundation.md) | Go module, layout, tooling (Phase 0) |
-| [02-api-gateway.md](02-api-gateway.md) | API Gateway + `GET /healthz` (Phase 0) |
-| [03-s3-backend-ci.md](03-s3-backend-ci.md) | Terraform remote state (S3 + lock); CI may be separate or folded |
-| [05-domain-types.md](05-domain-types.md) | `StripeEvent`, `Job`, fixtures — Phase 1 starts |
-| [06-config.md](06-config.md) | Env config + godotenv |
-| [07-queue-abstraction.md](07-queue-abstraction.md) | `Enqueuer` / `Consumer`, `MemoryQueue` |
-| [08-queue-from-config.md](08-queue-from-config.md) | `NewFromConfig`, `QUEUE_BACKEND` |
-| [09-parse-stripe-event.md](09-parse-stripe-event.md) | `ParseStripeEvent`, fixture tests |
+## How we work with Cursor
 
-**Note:** There is **no `04-` doc**; work jumped to **05** for domain types (see [03 next branch](03-s3-backend-ci.md)).
+When a branch is **finished** (reviewed, ready to merge), say:
+
+```text
+ms <branch-name>
+```
+
+Example: `ms 1-add-livez-and-readyz`. Treat that as the signal to merge to the parent line, tidy docs, or prep the next branch—as you prefer.
+
+## Branch write-ups (this track)
+
+Add a row when you open or complete a branch.
+
+| Branch (git) | Doc | Topic |
+|--------------|-----|--------|
+| `1-add-livez-and-readyz` | — | *Add doc when you merge* — `GET /livez`, `GET /readyz`, stdlib HTTP |
+
+**Doc template:** mirror the style in [original-branches](../original-branches/README.md): goal, scope, key files, how to verify, follow-ups.
+
+## Cross-links
+
+- [docs/README.md](../README.md) — docs index  
+- [docs/PROJECT_KNOWLEDGE.md](../PROJECT_KNOWLEDGE.md) — historical Lambda architecture and original build order §5  

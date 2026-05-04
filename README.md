@@ -89,4 +89,4 @@ Details and ordering: [PLAN.md](PLAN.md).
 
 ## Contributing / learning flow
 
-Implement **one milestone at a time**, keep `README.md` usage accurate, and record decisions and non-goals in [PLAN.md](PLAN.md).
+Implement **one milestone at a time**, keep `README.md` usage accurate, and record decisions in [PLAN.md](PLAN.md). Numbered git branches and optional notes: [docs/branches/README.md](docs/branches/README.md) (Lambda-era logs: [docs/original-branches/README.md](docs/original-branches/README.md)).

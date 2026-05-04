@@ -39,6 +39,8 @@ The **application** stays the same: Go HTTP server → Dockerfile → Deployment
 
 Each milestone lists **what to learn**, **what changes in the repo**, and **how you know you are done**. Implement **one milestone at a time**; prefer small commits and a working binary after each step.
 
+**Branch discipline:** Use numbered git branches (e.g. `1-add-livez-and-readyz`) and add a short write-up under **[docs/branches/](docs/branches/README.md)** when useful. When a branch is complete, use **`ms <branch-name>`** in chat so the next step (merge, doc update) is explicit.
+
 ---
 
 ## Milestone 1: HTTP service (local)

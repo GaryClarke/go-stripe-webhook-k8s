@@ -48,7 +48,7 @@ make lint
 - `testdata/.gitkeep`
 - `docs/PROJECT_KNOWLEDGE.md`
 - `docs/README.md`
-- `docs/branches/01-foundation.md`
+- `docs/original-branches/01-foundation.md`
 
 ## Next branch
 
