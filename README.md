@@ -1,31 +1,92 @@
-# Integration Engine
+# go-stripe-webhook-k8s
 
-Event-driven webhook integration engine: receive → validate → queue → process → forward. Built in Go, deployable to AWS (Lambda, SQS, API Gateway).
+A **Kubernetes-oriented** Stripe webhook service in Go. This repository continues the domain and parsing logic from an earlier **AWS Lambda** integration engine, but the deployment target is **containers on Kubernetes or OpenShift**, not API Gateway + Lambda.
 
-## Docs
+For the learning roadmap, milestones, and design notes, see **[PLAN.md](PLAN.md)**.
 
-- **[Project knowledge](docs/PROJECT_KNOWLEDGE.md)** - Plan, local vs Lambda, how Lambda is invoked, build order.
-- **Branch logs** - `docs/branches/` (decisions and scope per branch).
+## What you get (target shape)
 
-## Quick start (after Phase 1)
+- **HTTP API**: `POST /webhooks/stripe` (validate signature, process or hand off events, respond quickly).
+- **Operations**: `GET /livez` and `GET /readyz` for probes.
+- **Runtimes**: local process, Docker image, then manifests for Kubernetes / Route for OpenShift.
+
+Legacy Lambda and Terraform artefacts may remain in the tree during the transition; new work follows [PLAN.md](PLAN.md).
+
+## Requirements
+
+- [Go](https://go.dev/dl/) (see `go.mod` for the toolchain version).
+- Optional: Docker, `kubectl`, and a **local** Kubernetes cluster (Docker Desktop Kubernetes, Minikube, or kind) when you reach Milestones 3–4. Remote cluster and registry are optional later; see [PLAN.md — Deployment phases](PLAN.md#deployment-phases).
+
+## Local development
+
+### Milestone 1 (HTTP server)
+
+When `cmd/api` exists, the intended flow is:
 
 ```bash
-# Dependencies
 go mod tidy
-
-# Lint and test
-make lint
-make test
-
-# Local run (when entry points exist)
-# make run-local
+go run ./cmd/api
 ```
 
-## Layout
+Verify liveness:
 
-- `cmd/` - Entry points (ingest-local, ingest Lambda, worker-local, worker Lambda).
-- `internal/` - Shared packages (engine, queue, config, handlers).
-- `testdata/` - Fixtures (e.g. Stripe webhook samples).
-- `docs/` - Project knowledge and branch documentation.
+```bash
+curl -sS http://localhost:8080/livez
+```
 
-See [docs/PROJECT_KNOWLEDGE.md](docs/PROJECT_KNOWLEDGE.md) for architecture and phases.
+Use the port from your config (default `8080` once wired). See [PLAN.md](PLAN.md) Milestone 1 for the full “done when” checklist.
+
+### Current entrypoint (Lambda, transitional)
+
+Until the HTTP server lands, the shipped ingest entrypoint is still Lambda-oriented:
+
+```bash
+go build -o /tmp/ingest ./cmd/ingest
+```
+
+For historical architecture and phases from the Lambda project, see [docs/PROJECT_KNOWLEDGE.md](docs/PROJECT_KNOWLEDGE.md).
+
+## Tests and quality
+
+```bash
+go test ./...
+make lint
+```
+
+## Docker (Milestone 3)
+
+After the `Dockerfile` is added:
+
+```bash
+docker build -t go-stripe-webhook-k8s .
+docker run --rm -p 8080:8080 --env-file .env go-stripe-webhook-k8s
+```
+
+Adjust image name, port, and env file path to match your setup.
+
+## Kubernetes (Milestones 4–5)
+
+**Local first:** Run a real cluster on your machine (Docker Desktop Kubernetes, Minikube, or kind), then `kubectl apply -f k8s/`. That is a genuine deploy: same **Deployment** and **Service** pattern you will use elsewhere; you are only avoiding cloud IAM/VPC complexity until in-cluster concepts are familiar.
+
+- Apply manifests under `k8s/` (and OpenShift `Route` under `openshift/` when present).
+- Use `kubectl port-forward` to reach the Service from your machine until an Ingress or Route is configured.
+
+**Later (optional):** Push the image to a registry and target a remote cluster (e.g. OpenShift Developer Sandbox before EKS). The Go service, Dockerfile, and manifests do not need redesign—only image delivery and cluster credentials. See [PLAN.md — Deployment phases](PLAN.md#deployment-phases).
+
+Details and ordering: [PLAN.md](PLAN.md).
+
+## Layout (evolving)
+
+| Path | Role |
+|------|------|
+| `cmd/api` | HTTP service entrypoint (planned; primary target for local and container runs). |
+| `cmd/ingest` | Transitional Lambda-oriented binary from the fork. |
+| `internal/` | Shared packages (config, engine, queue, etc.). |
+| `testdata/` | Stripe webhook fixtures. |
+| `k8s/` | Kubernetes manifests (as milestones progress). |
+| `openshift/` | OpenShift `Route` and related objects (Milestone 5). |
+| `docs/` | Deeper design history from the Lambda era. |
+
+## Contributing / learning flow
+
+Implement **one milestone at a time**, keep `README.md` usage accurate, and record decisions and non-goals in [PLAN.md](PLAN.md).
