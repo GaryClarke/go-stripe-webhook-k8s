@@ -16,7 +16,7 @@ Add a row when you open or complete a branch.
 
 | Branch (git) | Doc | Topic |
 |--------------|-----|--------|
-| `1-add-livez-and-readyz` | — | `GET /livez`, `GET /readyz`, stdlib JSON probes |
+| `1-add-livez-and-readyz` | [01-add-livez-and-readyz.md](01-add-livez-and-readyz.md) | `GET /livez`, `GET /readyz`, stdlib JSON probes |
 | `2-graceful-shutdown` | [02-graceful-shutdown.md](02-graceful-shutdown.md) | `http.Server`, SIGINT/SIGTERM, `Shutdown` with timeout |
 
 **Doc template:** mirror the style in [original-branches](../original-branches/README.md): goal, scope, key files, how to verify, follow-ups.
