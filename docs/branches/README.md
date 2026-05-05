@@ -6,15 +6,9 @@ Work proceeds in **small, numbered git branches** that each map to **one unit of
 - **Learning roadmap and milestones:** see **[PLAN.md](../../PLAN.md)** (source of truth for what “Milestone 1”, etc. means).
 - **Lambda-era branch logs** (original project) live under **[docs/original-branches/](../original-branches/README.md)** — same idea, different phase of the repo.
 
-## How we work with Cursor
+## Cursor workflow
 
-When a branch is **finished** (reviewed, ready to merge), say:
-
-```text
-ms <branch-name>
-```
-
-Example: `ms 1-add-livez-and-readyz`. Treat that as the signal to merge to the parent line, tidy docs, or prep the next branch—as you prefer.
+All chat shorthands and merge behaviour: **[cursor-rules.md](../../cursor-rules.md)** only. This index stays about **what** each branch documents, not command definitions.
 
 ## Branch write-ups (this track)
 
