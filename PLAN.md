@@ -141,6 +141,7 @@ Record short, dated bullets as you go (examples below).
 
 - *Example:* YYYY-MM-DD — `/readyz` equals process up until Redis is required.
 - *Example:* YYYY-MM-DD — Standardise on port 8080 for app, Service targetPort, and examples.
+- **2026-05-04** — Graceful **`Shutdown`** uses a **10s** context timeout; revisit when adding Kubernetes **`terminationGracePeriodSeconds`**.
 
 ---
 
