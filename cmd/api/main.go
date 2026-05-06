@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"runtime/debug"
 	"syscall"
 	"time"
 )
@@ -35,12 +36,14 @@ func main() {
 	})
 
 	addr := ":8080"
+	handler := Recover(mux)
+
 	// http.Server is the long-lived server value. Using it (instead of
 	// http.ListenAndServe alone) gives us Shutdown(), which Kubernetes expects
 	// when the pod gets SIGTERM: drain in-flight work, then exit cleanly.
 	srv := &http.Server{
 		Addr:    addr,
-		Handler: mux,
+		Handler: handler,
 	}
 
 	// ListenAndServe blocks for the whole lifetime of the server. If we called it
@@ -84,4 +87,22 @@ func main() {
 	if err := srv.Shutdown(ctx); err != nil {
 		log.Printf("shutdown: %v", err)
 	}
+}
+
+// Recover returns middleware that recovers from panics in downstream handlers.
+// It logs the panic value and stack, then writes HTTP 500. Without this hook,
+// a single panic would terminate the process. Safe to wrap the root ServeMux
+// so every route, including /livez and /readyz, is covered.
+func Recover(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer func() {
+			if err := recover(); err != nil {
+				// Log for operators; never send panic text or stack to clients in prod.
+				log.Printf("panic: %v\n%s", err, debug.Stack())
+				// If headers already sent, you cannot change status; http.Error may still write body.
+				http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+			}
+		}()
+		next.ServeHTTP(w, r)
+	})
 }
