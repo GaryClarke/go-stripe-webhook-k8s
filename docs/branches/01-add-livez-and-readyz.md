@@ -26,6 +26,6 @@ Expect **HTTP 200** and JSON **`{"status":"ok"}`** for both (readiness intention
 
 ## Follow-ups
 
-- **02-graceful-shutdown** - **`http.Server`**, signals, **`Shutdown`**.
-- **03-panic-recovery** - **`recover`** middleware.
+- **02-graceful-shutdown** - **`http.Server`**, signals, **`Shutdown`**. See [02-graceful-shutdown.md](02-graceful-shutdown.md).
+- **03-recover-panic** - **`Recover`**, **`httptest`**. See [03-recover-panic.md](03-recover-panic.md).
 - **`POST /webhooks/stripe`** (stub or real) to complete Milestone 1 **Build** line in **`PLAN.md`**.

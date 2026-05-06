@@ -28,6 +28,6 @@ Expect **"shutting down..."** in logs and process exit without **`listen:`** fat
 
 ## Follow-ups
 
-- **03-panic-recovery** - recover panics in the handler stack.
+- **03-recover-panic** - see [03-recover-panic.md](03-recover-panic.md) (done on branch **`3-recover-panic`**).
 - Align shutdown timeout with **`terminationGracePeriodSeconds`** when **`k8s/`** manifests exist.
 - **`PORT`** from env (Milestone 2).
