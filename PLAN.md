@@ -47,11 +47,13 @@ Each milestone lists **what to learn**, **what changes in the repo**, and **how 
 
 | | |
 |--|--|
-| **Learn** | HTTP handlers in Go; `/livez` and `/readyz`; graceful shutdown. |
-| **Build** | `cmd/api` with `POST /webhooks/stripe`, `GET /livez`, `GET /readyz`. |
-| **Done when** | `go run ./cmd/api` and `curl` to `/livez` succeeds (and `/readyz` behaves as documented). |
+| **Learn** | HTTP handlers in Go; `/livez` and `/readyz`; graceful shutdown; **light operational logging** (e.g. one line when the webhook is hit - no structured JSON required yet). |
+| **Build** | `cmd/api` with `GET /livez`, `GET /readyz`, **`POST /webhooks/stripe`** (v1 stub is fine: accept POST, read body safely, **204** or **200**, log receipt; **no** Stripe signature verification until Milestone 2). |
+| **Done when** | `go run ./cmd/api`; `curl` **GET** `/livez` and **POST** `/webhooks/stripe` behave as expected; `/readyz` as documented. |
 
-**Note on readiness:** For v1, `/readyz` may match `/livez` until Milestone 6 adds shared dependencies (e.g. DB/Redis). Document the chosen rule in a PR or under [Decisions](#decisions) below.
+**Suggested next branch:** e.g. **`4-webhook-stripe-stub`** (or similar) if probes and shutdown are already on **`main`**.
+
+**Note on readiness:** For v1, `/readyz` may match `/livez` until **Milestone 7** adds shared dependencies (e.g. DB/Redis) for idempotency. Document the chosen rule under [Decisions](#decisions) when it changes.
 
 ---
 
@@ -63,15 +65,19 @@ Each milestone lists **what to learn**, **what changes in the repo**, and **how 
 | **Build** | Config for `STRIPE_WEBHOOK_SECRET`, `DOWNSTREAM_URL`, `PORT` (and any other required keys). |
 | **Done when** | App reads config from the environment; **missing required config fails fast with a clear error**. |
 
+**Logging:** Keep **simple** `log` lines for important paths (e.g. webhook received, config load failures). **Structured JSON** and **correlation IDs** are **Milestone 6**.
+
 ---
 
 ## Milestone 3: Containerise
 
 | | |
 |--|--|
-| **Learn** | Dockerfile; multi-stage builds; non-root user and minimal image basics. |
-| **Build** | `Dockerfile`, `.dockerignore`. |
+| **Learn** | Dockerfile; multi-stage builds; **non-root user** and minimal image basics (prepares for **Pod securityContext** in Milestone 4). |
+| **Build** | `Dockerfile`, `.dockerignore`. Image must run as **non-root** if you want **`runAsNonRoot: true`** on the Deployment without fighting the runtime. |
 | **Done when** | `docker build` and `docker run` (with env file or `-e`) expose the API and health endpoints on the expected port. |
+
+**Optional stretch:** If you aim for **`readOnlyRootFilesystem: true`** later, ensure the process needs **no writable layer** (or add a documented `emptyDir` mount when you hit that in Milestone 4).
 
 ---
 
@@ -79,9 +85,16 @@ Each milestone lists **what to learn**, **what changes in the repo**, and **how 
 
 | | |
 |--|--|
-| **Learn** | Pod, Deployment, Service; liveness and readiness probes; port alignment (`containerPort` ↔ `Service` ↔ `port-forward`). |
-| **Build** | `k8s/deployment.yaml`, `k8s/service.yaml`. |
-| **Done when** | On a **local** Kubernetes cluster (Docker Desktop, Minikube, or kind): `kubectl apply -f k8s/`, pods ready, `kubectl port-forward svc/...` reaches webhook and health URLs. |
+| **Learn** | Pod, Deployment, Service; probes; **Secrets** wiring; **resource requests/limits**; **Pod `securityContext`** (OpenShift-friendly); port alignment (`containerPort` ↔ `Service` ↔ `port-forward`). |
+| **Build** | Core YAML under `k8s/` (see list below). |
+| **Done when** | On a **local** Kubernetes cluster (Docker Desktop, Minikube, or kind): `kubectl apply -f k8s/`, pods ready, `kubectl port-forward svc/...` reaches webhook and health URLs; Secret-backed config is **documented** and **safe for git**. |
+
+**Include in `k8s/` (or README-only where noted):**
+
+- **`deployment.yaml`** and **`service.yaml`** as before.
+- **Secrets:** **`k8s/secret.yaml`** with **placeholder** values *or* documented **`kubectl create secret generic ...`** / **`--dry-run=client -o yaml`** flow - **never commit real Stripe secrets**. Wire **`STRIPE_WEBHOOK_SECRET`** (and related keys) with **`envFrom`** or **`secretKeyRef`**.
+- **`resources.requests` and `resources.limits`** (starter values are enough to learn the knobs).
+- **`securityContext`:** e.g. **`runAsNonRoot: true`**, **`allowPrivilegeEscalation: false`**, and optionally **`readOnlyRootFilesystem: true`** when the image tolerates it (may need **`emptyDir`** for temp paths later).
 
 This **is** a real deployment: workloads run on a real kubelet; the only deliberate scope choice is **Phase A** (local control plane). See [Deployment phases](#deployment-phases) before pushing the same image and manifests to a remote cluster.
 
@@ -101,7 +114,19 @@ For a **remote** OpenShift experience without standing up AWS yourself, the [Red
 
 ---
 
-## Milestone 6: Idempotency
+## Milestone 6: Observability
+
+| | |
+|--|--|
+| **Learn** | Structured logs; request or correlation IDs; operational log lines without secrets. |
+| **Build** | Consistent JSON (or agreed format); log receipt, Stripe event id, outcome, errors. |
+| **Done when** | `kubectl logs` is enough to trace a single webhook through the service. |
+
+**Ordering:** This milestone sits **before idempotency** (Milestone 7) so logs help debug duplicate delivery and storage behaviour.
+
+---
+
+## Milestone 7: Idempotency
 
 | | |
 |--|--|
@@ -110,16 +135,6 @@ For a **remote** OpenShift experience without standing up AWS yourself, the [Red
 | **Done when** | Sending the same Stripe event twice results in **one** effective processing path. |
 
 In-memory dedupe is acceptable only as a **demonstration** with explicit “single replica only” caveats.
-
----
-
-## Milestone 7: Observability
-
-| | |
-|--|--|
-| **Learn** | Structured logs; request or correlation IDs; operational log lines without secrets. |
-| **Build** | Consistent JSON (or agreed format); log receipt, Stripe event id, outcome, errors. |
-| **Done when** | `kubectl logs` is enough to trace a single webhook through the service. |
 
 ---
 
@@ -141,7 +156,7 @@ Record short, dated bullets as you go (examples below).
 
 - *Example:* YYYY-MM-DD — `/readyz` equals process up until Redis is required.
 - *Example:* YYYY-MM-DD — Standardise on port 8080 for app, Service targetPort, and examples.
-- **2026-05-04** — Graceful **`Shutdown`** uses a **10s** context timeout; revisit when adding Kubernetes **`terminationGracePeriodSeconds`**.
+- **2026-05-06** - **Milestone 6 = Observability**, **Milestone 7 = Idempotency** (swap so logs aid debugging idempotency work).
 
 ---
 

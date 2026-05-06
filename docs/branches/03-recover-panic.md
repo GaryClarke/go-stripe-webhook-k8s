@@ -30,4 +30,4 @@ No **`/panic`** route should exist on the running server.
 
 - **`POST /webhooks/stripe`** (stub or real) to complete Milestone 1 **Build** in **`PLAN.md`**.
 - **`PORT`** from env (Milestone 2).
-- **`Chain`** or more middleware when you add request IDs / access logs (see Milestone 7).
+- **`Chain`** or more middleware when you add request IDs / access logs (see Milestone 6).
