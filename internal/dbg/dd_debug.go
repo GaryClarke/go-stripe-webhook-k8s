@@ -1,4 +1,7 @@
+//go:build debug
+
 // Package dbg provides DD: spew to stderr then exit 1 (works with Recover).
+// Build with -tags debug to enable (e.g. go run -tags debug ./cmd/api).
 package dbg
 
 import (
