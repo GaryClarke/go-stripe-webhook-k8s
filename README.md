@@ -28,6 +28,8 @@ go mod tidy
 go run ./cmd/api
 ```
 
+Optional **debug dumps** (**`internal/dbg.DD`**, **`spew`** + exit): **`go run -tags debug ./cmd/api`** or **`go test -tags debug ./...`** (see [PLAN.md](PLAN.md) Milestone 1).
+
 Verify liveness:
 
 ```bash

@@ -53,7 +53,7 @@ Each milestone lists **what to learn**, **what changes in the repo**, and **how 
 
 **Local-only scratch files:** If you add throwaway **`*.go`** snippets for experiments, use a dedicated name and list it in **your** global gitignore so it is never committed. This repo documents the convention as **`zzz_stripe_webhook_k8s_dd_scratch_only.go`** (unlikely to collide with normal source names; avoid a leading dot on the basename so the Go toolchain still compiles the file when you want it to).
 
-**Suggested next branch:** e.g. **`5-add-dbg-dd`** (or fold into the next Milestone 1 tweak) once **`internal/dbg`** is on **`main`**.
+**Suggested next branch:** toward **Milestone 2** (e.g. **`6-config-env`** or **`6-milestone-2-config`**) - env config, **`PORT`**, **`STRIPE_WEBHOOK_SECRET`**, fail-fast validation.
 
 **Note on readiness:** For v1, `/readyz` may match `/livez` until **Milestone 7** adds shared dependencies (e.g. DB/Redis) for idempotency. Document the chosen rule under [Decisions](#decisions) when it changes.
 
