@@ -48,10 +48,12 @@ Each milestone lists **what to learn**, **what changes in the repo**, and **how 
 | | |
 |--|--|
 | **Learn** | HTTP handlers in Go; `/livez` and `/readyz`; graceful shutdown; **light operational logging** (e.g. one line when the webhook is hit - no structured JSON required yet). |
-| **Build** | `cmd/api` with `GET /livez`, `GET /readyz`, **`POST /webhooks/stripe`** (v1 stub is fine: accept POST, read body safely, **204** or **200**, log receipt; **no** Stripe signature verification until Milestone 2). |
+| **Build** | `cmd/api` with `GET /livez`, `GET /readyz`, **`POST /webhooks/stripe`** (v1 stub is fine: accept POST, read body safely, **204** or **200**, log receipt; **no** Stripe signature verification until Milestone 2). **`internal/dbg`** with **`DD`** (`go-spew` to **stderr**, then **`os.Exit(1)`**) for dump-and-stop debugging in handlers and tests without relying on **panic** (so **`Recover`** does not hide output). |
 | **Done when** | `go run ./cmd/api`; `curl` **GET** `/livez` and **POST** `/webhooks/stripe` behave as expected; `/readyz` as documented. |
 
-**Suggested next branch:** e.g. **`4-webhook-stripe-stub`** (or similar) if probes and shutdown are already on **`main`**.
+**Local-only scratch files:** If you add throwaway **`*.go`** snippets for experiments, use a dedicated name and list it in **your** global gitignore so it is never committed. This repo documents the convention as **`zzz_stripe_webhook_k8s_dd_scratch_only.go`** (unlikely to collide with normal source names; avoid a leading dot on the basename so the Go toolchain still compiles the file when you want it to).
+
+**Suggested next branch:** e.g. **`5-add-dbg-dd`** (or fold into the next Milestone 1 tweak) once **`internal/dbg`** is on **`main`**.
 
 **Note on readiness:** For v1, `/readyz` may match `/livez` until **Milestone 7** adds shared dependencies (e.g. DB/Redis) for idempotency. Document the chosen rule under [Decisions](#decisions) when it changes.
 
@@ -160,6 +162,7 @@ Record short, dated bullets as you go (examples below).
 - *Example:* YYYY-MM-DD — Standardise on port 8080 for app, Service targetPort, and examples.
 - **2026-05-06** - **Milestone 6 = Observability**, **Milestone 7 = Idempotency** (swap so logs aid debugging idempotency work).
 - **2026-05-06** - HTTP routes live in **`cmd/api` `newMux()`**; evolve toward **`application` struct + `routes()`** when **Milestone 2** config lands (see Milestone 1 layout note).
+- **2026-05-07** - **`internal/dbg.DD`** uses **`spew`** to **stderr** and **`os.Exit(1)`** so dumps are visible even when **`Recover`** wraps handlers. Optional scratch filename **`zzz_stripe_webhook_k8s_dd_scratch_only.go`** is for personal global gitignore only, not a committed artefact.
 
 ---
 
