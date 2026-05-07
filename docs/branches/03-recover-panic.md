@@ -28,6 +28,6 @@ No **`/panic`** route should exist on the running server.
 
 ## Follow-ups
 
-- **`POST /webhooks/stripe`** (stub or real) to complete Milestone 1 **Build** in **`PLAN.md`**.
+- **04-webhook-stripe-stub** - see [04-webhook-stripe-stub.md](04-webhook-stripe-stub.md) (stub route + **`newMux`** layout).
 - **`PORT`** from env (Milestone 2).
 - **`Chain`** or more middleware when you add request IDs / access logs (see Milestone 6).

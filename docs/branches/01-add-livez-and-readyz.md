@@ -28,4 +28,4 @@ Expect **HTTP 200** and JSON **`{"status":"ok"}`** for both (readiness intention
 
 - **02-graceful-shutdown** - **`http.Server`**, signals, **`Shutdown`**. See [02-graceful-shutdown.md](02-graceful-shutdown.md).
 - **03-recover-panic** - **`Recover`**, **`httptest`**. See [03-recover-panic.md](03-recover-panic.md).
-- **`POST /webhooks/stripe`** (stub or real) to complete Milestone 1 **Build** line in **`PLAN.md`**.
+- **04-webhook-stripe-stub** - **`POST /webhooks/stripe`**. See [04-webhook-stripe-stub.md](04-webhook-stripe-stub.md).

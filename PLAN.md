@@ -55,6 +55,8 @@ Each milestone lists **what to learn**, **what changes in the repo**, and **how 
 
 **Note on readiness:** For v1, `/readyz` may match `/livez` until **Milestone 7** adds shared dependencies (e.g. DB/Redis) for idempotency. Document the chosen rule under [Decisions](#decisions) when it changes.
 
+**`cmd/api` layout:** HTTP routes are registered in **`newMux()`** (`cmd/api/mux.go`) so **`main`** only concerns server lifecycle and **`Recover`**, and tests reuse the same route table. **Future (around Milestone 2+):** introduce a small **`application`** struct holding **`*config.Config`** (and later downstream / queue clients), then either **`func (app *application) routes() http.Handler`** or **`newMux(app *application)`**, moving handlers to methods **`app.handleStripeWebhook`** so dependencies are explicit instead of package-level state.
+
 ---
 
 ## Milestone 2: Configuration and secrets
@@ -157,6 +159,7 @@ Record short, dated bullets as you go (examples below).
 - *Example:* YYYY-MM-DD — `/readyz` equals process up until Redis is required.
 - *Example:* YYYY-MM-DD — Standardise on port 8080 for app, Service targetPort, and examples.
 - **2026-05-06** - **Milestone 6 = Observability**, **Milestone 7 = Idempotency** (swap so logs aid debugging idempotency work).
+- **2026-05-06** - HTTP routes live in **`cmd/api` `newMux()`**; evolve toward **`application` struct + `routes()`** when **Milestone 2** config lands (see Milestone 1 layout note).
 
 ---
 

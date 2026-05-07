@@ -1,0 +1,33 @@
+# Branch 04: Stripe webhook stub (`POST /webhooks/stripe`)
+
+**Goal:** Complete the **Milestone 1** application surface: **`POST /webhooks/stripe`** as a **stub** (no signature verification yet), reuse **`engine.ParseStripeEvent`**, keep **`204`** on success, and align routing with production tests.
+
+## What we added
+
+- **`handleStripeWebhook`** in **`cmd/api/mux.go`**: **`http.MaxBytesReader`** (**1 MiB** cap), **`engine.ParseStripeEvent`**, **400** / **413** on bad input / oversize, **204** on success.
+- **Logging:** **`event_id`**, **`type`**, **`body_bytes`**, **`stripe_signature_present`** (boolean only), **`remote_addr`** - no **`Stripe-Signature`** header value logged.
+- **`cmd/api/mux.go`**: **`newMux()`**, **`handleLivez`**, **`handleReadyz`**, **`Recover`** - **`main.go`** is lifecycle only.
+- **`cmd/api/webhook_test.go`**: **`apiHandler()`** = same stack as **`main`** (**`Recover(newMux())`**), **`ServeHTTP`** on Stripe and **`/livez`** cases.
+- **`PLAN.md`**: **`cmd/api` layout** note and Decision for **`newMux()`** evolution toward **`application`**.
+
+## Files changed (high level)
+
+- **`cmd/api/mux.go`** (new), **`cmd/api/main.go`**, **`cmd/api/webhook_test.go`** (new), **`PLAN.md`**
+
+## How to verify
+
+```bash
+go test ./...
+go run ./cmd/api
+curl -sS -i -X POST http://localhost:8080/webhooks/stripe \
+  -H 'Content-Type: application/json' \
+  --data @testdata/stripe-invoice-payment-succeeded.json
+```
+
+Expect **204** and a structured log line with **`event_id`** / **`type`**.
+
+## Follow-ups
+
+- **Milestone 2:** **`STRIPE_WEBHOOK_SECRET`**, signature verification, **`PORT`**, **`DOWNSTREAM_URL`**.
+- **`internal/dbg.DD`** (optional): **`spew` + `os.Exit`** for temporary debugging (not committed as permanent calls).
+- **`TestAPI_Readyz`** mirror of **`TestAPI_Livez`** if you want symmetry.

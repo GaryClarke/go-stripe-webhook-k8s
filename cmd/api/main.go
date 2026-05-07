@@ -2,41 +2,18 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"log"
 	"net/http"
 	"os"
 	"os/signal"
-	"runtime/debug"
 	"syscall"
 	"time"
 )
 
-// healthResponse is used for probe-style JSON bodies (livez, readyz).
-type healthResponse struct {
-	Status string `json:"status"`
-}
-
 func main() {
-	mux := http.NewServeMux()
-	mux.HandleFunc("GET /livez", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json; charset=utf-8")
-		resp := healthResponse{Status: "ok"}
-		if err := json.NewEncoder(w).Encode(resp); err != nil {
-			log.Printf("livez: encode response: %v", err)
-		}
-	})
-	mux.HandleFunc("GET /readyz", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json; charset=utf-8")
-		resp := healthResponse{Status: "ok"}
-		if err := json.NewEncoder(w).Encode(resp); err != nil {
-			log.Printf("readyz: encode response: %v", err)
-		}
-	})
-
 	addr := ":8080"
-	handler := Recover(mux)
+	handler := Recover(newMux())
 
 	// http.Server is the long-lived server value. Using it (instead of
 	// http.ListenAndServe alone) gives us Shutdown(), which Kubernetes expects
@@ -87,22 +64,4 @@ func main() {
 	if err := srv.Shutdown(ctx); err != nil {
 		log.Printf("shutdown: %v", err)
 	}
-}
-
-// Recover returns middleware that recovers from panics in downstream handlers.
-// It logs the panic value and stack, then writes HTTP 500. Without this hook,
-// a single panic would terminate the process. Safe to wrap the root ServeMux
-// so every route, including /livez and /readyz, is covered.
-func Recover(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		defer func() {
-			if err := recover(); err != nil {
-				// Log for operators; never send panic text or stack to clients in prod.
-				log.Printf("panic: %v\n%s", err, debug.Stack())
-				// If headers already sent, you cannot change status; http.Error may still write body.
-				http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
-			}
-		}()
-		next.ServeHTTP(w, r)
-	})
 }
