@@ -59,6 +59,12 @@ Each milestone lists **what to learn**, **what changes in the repo**, and **how 
 
 **`cmd/api` layout:** HTTP routes are registered in **`newMux()`** (`cmd/api/mux.go`) so **`main`** only concerns server lifecycle and **`Recover`**, and tests reuse the same route table. **Future (around Milestone 2+):** introduce a small **`application`** struct holding **`*config.Config`** (and later downstream / queue clients), then either **`func (app *application) routes() http.Handler`** or **`newMux(app *application)`**, moving handlers to methods **`app.handleStripeWebhook`** so dependencies are explicit instead of package-level state.
 
+**Milestone 1 carry-forward notes (non-blocking):**
+
+- Prefer names like **`signaturePresent`** for **`Stripe-Signature`** until Milestone 2 actually **verifies** the signature (avoid **`sigOK`**-style names that imply validation).
+- **`maxStripeWebhookBody`** ( **`http.MaxBytesReader`** cap) is fine as a **constant** in Milestone 1; **Milestone 2** can load a limit from **config** if you want it tunable without a rebuild.
+- **`Recover`** cannot reliably turn a response into **500** if the handler **already wrote headers**; **`cmd/api/mux.go`** documents that next to **`http.Error`**. Good enough for Milestone 1.
+
 ---
 
 ## Milestone 2: Configuration and secrets
@@ -70,6 +76,8 @@ Each milestone lists **what to learn**, **what changes in the repo**, and **how 
 | **Done when** | App reads config from the environment; **missing required config fails fast with a clear error**. |
 
 **Logging:** Keep **simple** `log` lines for important paths (e.g. webhook received, config load failures). **Structured JSON** and **correlation IDs** are **Milestone 6**.
+
+**Stripe webhook verification:** Verify **`Stripe-Signature`** against the **raw request body** (the same bytes Stripe signed). The Milestone 1 handler already reads **`body`** before **`ParseStripeEvent`**, which is the right order for plugging in verification in Milestone 2.
 
 ---
 

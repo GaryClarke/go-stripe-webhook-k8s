@@ -67,10 +67,10 @@ func handleStripeWebhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Log whether Stripe signed the request; never log the header value (verification comes in Milestone 2).
-	sigOK := r.Header.Get("Stripe-Signature") != ""
+	// Log whether the Stripe-Signature header is present; never log the value (verification comes in Milestone 2).
+	signaturePresent := r.Header.Get("Stripe-Signature") != ""
 	log.Printf("webhooks/stripe: event_id=%q type=%q body_bytes=%d stripe_signature_present=%v remote_addr=%s",
-		ev.ID, ev.Type, len(body), sigOK, r.RemoteAddr)
+		ev.ID, ev.Type, len(body), signaturePresent, r.RemoteAddr)
 
 	w.WriteHeader(http.StatusNoContent)
 }
