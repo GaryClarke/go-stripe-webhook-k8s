@@ -53,7 +53,7 @@ Each milestone lists **what to learn**, **what changes in the repo**, and **how 
 
 **Local-only scratch files:** If you add throwaway **`*.go`** snippets for experiments, use a dedicated name and list it in **your** global gitignore so it is never committed. This repo documents the convention as **`zzz_stripe_webhook_k8s_dd_scratch_only.go`** (unlikely to collide with normal source names; avoid a leading dot on the basename so the Go toolchain still compiles the file when you want it to).
 
-**Suggested next branch:** toward **Milestone 2** (e.g. **`6-config-env`** or **`6-milestone-2-config`**) - env config, **`PORT`**, **`STRIPE_WEBHOOK_SECRET`**, fail-fast validation.
+**Milestone 1 status:** Complete on **`main`**: probes, webhook stub, graceful shutdown, **`Recover`**, **`internal/dbg`**, tests including **`TestAPI_Readyz`**. Proceed to **Milestone 2** on a **`6-*`** branch (see [Milestone 2](#milestone-2-configuration-and-secrets)).
 
 **Note on readiness:** For v1, `/readyz` may match `/livez` until **Milestone 7** adds shared dependencies (e.g. DB/Redis) for idempotency. Document the chosen rule under [Decisions](#decisions) when it changes.
 
@@ -72,12 +72,28 @@ Each milestone lists **what to learn**, **what changes in the repo**, and **how 
 | | |
 |--|--|
 | **Learn** | Environment variables; ConfigMap vs Secret; Stripe webhook signing secret. |
-| **Build** | Config for `STRIPE_WEBHOOK_SECRET`, `DOWNSTREAM_URL`, `PORT` (and any other required keys). |
-| **Done when** | App reads config from the environment; **missing required config fails fast with a clear error**. |
+| **Build** | HTTP API config: **`PORT`** (default **8080**), required **`STRIPE_WEBHOOK_SECRET`**, webhook **signature verification** on the raw body; fail fast when **required** vars are missing. **`DOWNSTREAM_URL`** only when the app actually calls downstream (otherwise **optional** or **deferred** - see notes). Reuse or extend **`internal/config`** as needed (a Lambda-era **`Load()`** may already exist - evolve it for **`cmd/api`** rather than duplicating loaders). |
+| **Done when** | App reads config from the environment; **missing required config fails fast with a clear error**; invalid Stripe signatures rejected with an appropriate HTTP status. |
 
 **Logging:** Keep **simple** `log` lines for important paths (e.g. webhook received, config load failures). **Structured JSON** and **correlation IDs** are **Milestone 6**.
 
 **Stripe webhook verification:** Verify **`Stripe-Signature`** against the **raw request body** (the same bytes Stripe signed). The Milestone 1 handler already reads **`body`** before **`ParseStripeEvent`**, which is the right order for plugging in verification in Milestone 2.
+
+**Git branch (suggested names):** **`6-milestone-2-config`** or **`6-config-env`**.
+
+**Primary target:** load config from the environment and **fail fast** when **required** variables are missing.
+
+**Suggested implementation order** (one branch or a small sequence):
+
+1. **`internal/config`** (or extend existing package) for **`cmd/api`**.
+2. **`PORT`** with default **8080**.
+3. Require **`STRIPE_WEBHOOK_SECRET`** at startup (or wherever **`Load`** runs).
+4. **`DOWNSTREAM_URL`**: **optional** until outbound HTTP exists; do **not** fail startup for a var that has **no behaviour** unless you deliberately want a future hook.
+5. **`application`** struct (or equivalent) holding **`*config.Config`**; **`newMux(app *application)`** / **`app.handleStripeWebhook`** (see Milestone 1 layout note).
+6. Tests for config loading (missing var, default **`PORT`**, valid **`Load`**).
+7. Stripe signature verification after config is wired.
+
+**Roadmap context:** **Kubernetes / OpenShift** Secrets and **`securityContext`** stay in **Milestones 3–4** so they do not block local config work. **Observability** before **idempotency** (**Milestones 6 then 7**) remains the agreed order.
 
 ---
 
@@ -173,6 +189,7 @@ Record short, dated bullets as you go (examples below).
 - **2026-05-06** - **Milestone 6 = Observability**, **Milestone 7 = Idempotency** (swap so logs aid debugging idempotency work).
 - **2026-05-06** - HTTP routes live in **`cmd/api` `newMux()`**; evolve toward **`application` struct + `routes()`** when **Milestone 2** config lands (see Milestone 1 layout note).
 - **2026-05-07** - **`internal/dbg.DD`**: **`//go:build debug`** implementation (**`spew`** + **`os.Exit(1)`**); **`//go:build !debug`** no-op for release. Optional scratch filename **`zzz_stripe_webhook_k8s_dd_scratch_only.go`** is for personal global gitignore only, not a committed artefact.
+- **2026-05-08** - **Milestone 1** marked **complete** on **`main`**; **Milestone 2** **approved** shape: **`6-milestone-2-config`** or **`6-config-env`**, **`Load`**, fail-fast **`STRIPE_WEBHOOK_SECRET`**, **`PORT`** default **8080**, **`application` struct + config**, tests, then **Stripe** signature verification; **`DOWNSTREAM_URL`** **optional**/deferred until used. **Observability** (**Milestone 6**) before **idempotency** (**Milestone 7**); cluster **Secrets** / **`securityContext`** stay **Milestones 3–4** (no change).
 
 ---
 
