@@ -63,7 +63,7 @@ Each milestone lists **what to learn**, **what changes in the repo**, and **how 
 
 - Prefer names like **`signaturePresent`** for **`Stripe-Signature`** until Milestone 2 actually **verifies** the signature (avoid **`sigOK`**-style names that imply validation).
 - **`maxStripeWebhookBody`** ( **`http.MaxBytesReader`** cap) is fine as a **constant** in Milestone 1; **Milestone 2** can load a limit from **config** if you want it tunable without a rebuild.
-- **`Recover`** cannot reliably turn a response into **500** if the handler **already wrote headers**; **`cmd/api/mux.go`** documents that next to **`http.Error`**. Good enough for Milestone 1.
+- **`Recover`** cannot reliably turn a response into **500** if the handler **already wrote headers**; **`cmd/api/mux.go`** documents that next to **`http.Error`**. Acceptable for Milestone 1; plan to refine when you add response-wrapping middleware in **Milestone 6** (see that milestone).
 
 ---
 
@@ -135,6 +135,8 @@ For a **remote** OpenShift experience without standing up AWS yourself, the [Red
 | **Done when** | `kubectl logs` is enough to trace a single webhook through the service. |
 
 **Ordering:** This milestone sits **before idempotency** (Milestone 7) so logs help debug duplicate delivery and storage behaviour.
+
+**Recover / partial response (deferred from Milestone 1):** If a handler **panics after** it has already started the response (e.g. **`WriteHeader`** or body bytes on the wire), **`http.Error`** in **`Recover`** cannot reliably turn the client-visible outcome into **500** - see the comment on **`Recover`** in **`cmd/api/mux.go`**. When you add **response-wrapping** middleware here (logging, correlation IDs, body capture), revisit **`Recover`**: e.g. track whether the response has started and **log only** after that point, or use patterns built around **`http.ResponseWriter`** / **`http.ResponseController`** so panic handling does not double-write or corrupt the stream.
 
 ---
 

@@ -28,4 +28,3 @@ Release / CI: **omit** **`-tags debug`** (plain **`go build ./...`** is enough).
 
 - **Milestone 2:** **`STRIPE_WEBHOOK_SECRET`**, **`PORT`**, **`DOWNSTREAM_URL`**, config wiring.
 - Do **not** leave permanent **`dbg.DD`** calls in handlers; use only while debugging (reviews / grep).
-- **`TestAPI_Readyz`** symmetry (optional; see branch 04 notes).

@@ -30,4 +30,3 @@ Expect **204** and a structured log line with **`event_id`** / **`type`**.
 
 - **Milestone 2:** **`STRIPE_WEBHOOK_SECRET`**, signature verification, **`PORT`**, **`DOWNSTREAM_URL`**.
 - **`internal/dbg.DD`** - see [05-add-dbg-dd.md](05-add-dbg-dd.md) (build tag **`debug`**; no permanent calls in prod paths).
-- **`TestAPI_Readyz`** mirror of **`TestAPI_Livez`** if you want symmetry.

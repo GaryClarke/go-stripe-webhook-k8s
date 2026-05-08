@@ -66,3 +66,18 @@ func TestAPI_Livez(t *testing.T) {
 		t.Fatalf("Content-Type = %q", ct)
 	}
 }
+
+func TestAPI_Readyz(t *testing.T) {
+	t.Parallel()
+
+	req := httptest.NewRequest(http.MethodGet, "/readyz", nil)
+	rec := httptest.NewRecorder()
+	apiHandler().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("GET /readyz: status = %d, want %d", rec.Code, http.StatusOK)
+	}
+	if ct := rec.Header().Get("Content-Type"); ct != "application/json; charset=utf-8" {
+		t.Fatalf("Content-Type = %q", ct)
+	}
+}
