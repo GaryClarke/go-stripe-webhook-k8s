@@ -4,7 +4,7 @@
 
 ## What we added
 
-- **`cmd/api/main.go`** as the primary local binary (alongside transitional **`cmd/ingest`** Lambda entry).
+- **`cmd/api/main.go`** as the primary local binary (HTTP service).
 - **`GET /livez`** and **`GET /readyz`** returning **JSON** via **`encoding/json`** and a shared **`healthResponse`** shape (`{"status":"ok"}`).
 - **`ListenAndServe`** on **`:8080`** for a minimal blocking server (later superseded by **`http.Server`** and graceful shutdown in **branch 02**).
 - Repo hygiene from the same era: **`docs/original-branches/`** for Lambda branch logs, fresh **`docs/branches/`** index, **`PLAN.md`** / **`README.md`** pointers to **`cursor-rules.md`** for chat shorthands (**`ms`**, **`mmp`**, etc.).

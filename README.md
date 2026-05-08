@@ -38,15 +38,7 @@ curl -sS http://localhost:8080/livez
 
 Use the port from your config (default `8080` once wired). See [PLAN.md](PLAN.md) Milestone 1 for the full “done when” checklist.
 
-### Current entrypoint (Lambda, transitional)
-
-Until the HTTP server lands, the shipped ingest entrypoint is still Lambda-oriented:
-
-```bash
-go build -o /tmp/ingest ./cmd/ingest
-```
-
-For historical architecture and phases from the Lambda project, see [docs/PROJECT_KNOWLEDGE.md](docs/PROJECT_KNOWLEDGE.md).
+Historical Lambda / queue notes from the parent project live in [docs/PROJECT_KNOWLEDGE.md](docs/PROJECT_KNOWLEDGE.md).
 
 ## Tests and quality
 
@@ -81,9 +73,8 @@ Details and ordering: [PLAN.md](PLAN.md).
 
 | Path | Role |
 |------|------|
-| `cmd/api` | HTTP service entrypoint (planned; primary target for local and container runs). |
-| `cmd/ingest` | Transitional Lambda-oriented binary from the fork. |
-| `internal/` | Shared packages (config, engine, queue, etc.). |
+| `cmd/api` | HTTP service entrypoint for local and container runs. |
+| `internal/` | Shared packages (config, engine, dbg, etc.). |
 | `testdata/` | Stripe webhook fixtures. |
 | `k8s/` | Kubernetes manifests (as milestones progress). |
 | `openshift/` | OpenShift `Route` and related objects (Milestone 5). |

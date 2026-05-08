@@ -55,10 +55,10 @@ resource "aws_iam_role_policy_attachment" "payments_events_ingest_logs" {
 }
 
 # -----------------------------------------------------------------------------
-# Lambda: webhook ingest function
+# Lambda: webhook ingest function (legacy; parent project).
+# Build the zip with a Linux bootstrap binary if you need to refresh this stack.
+# This fork's CI does not run make build-ingest; produce ../build/bootstrap.zip locally.
 # -----------------------------------------------------------------------------
-# Build the zip first: from repo root, run: make build-ingest (or equivalent).
-# Zip must be at build/bootstrap.zip (Linux binary named "bootstrap" inside).
 
 resource "aws_lambda_function" "payments_events_ingest" {
   function_name = "integration-engine-payments-events-ingest"
