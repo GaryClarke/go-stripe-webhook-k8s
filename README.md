@@ -25,6 +25,7 @@ When `cmd/api` exists, the intended flow is:
 
 ```bash
 go mod tidy
+cp .env.example .env   # edit .env: STRIPE_WEBHOOK_SECRET is required for cmd/api
 go run ./cmd/api
 ```
 

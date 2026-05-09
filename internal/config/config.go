@@ -1,6 +1,7 @@
 package config
 
 import (
+	"errors"
 	"os"
 	"strings"
 
@@ -27,8 +28,13 @@ func Load() (*Config, error) {
 		port = defaultPort
 	}
 
+	stripeWebhookSecret := strings.TrimSpace(os.Getenv("STRIPE_WEBHOOK_SECRET"))
+	if stripeWebhookSecret == "" {
+		return nil, errors.New("config: STRIPE_WEBHOOK_SECRET is required")
+	}
+
 	return &Config{
-		StripeWebhookSecret: os.Getenv("STRIPE_WEBHOOK_SECRET"),
+		StripeWebhookSecret: stripeWebhookSecret,
 		Port:                port,
 	}, nil
 }
