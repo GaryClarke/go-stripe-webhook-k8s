@@ -2,13 +2,19 @@ package config
 
 import (
 	"os"
+	"strings"
 
 	"github.com/joho/godotenv"
 )
 
+// defaultPort is used when env PORT is unset or blank.
+const defaultPort = "8080"
+
 // Config holds application configuration from environment variables.
 type Config struct {
 	StripeWebhookSecret string
+	// Port is the listen port without a leading colon (e.g. "8080"). Use ":"+cfg.Port for http.Server.Addr.
+	Port string
 }
 
 // Load reads configuration from the environment.
@@ -16,7 +22,13 @@ type Config struct {
 func Load() (*Config, error) {
 	_ = godotenv.Load()
 
+	port := strings.TrimSpace(os.Getenv("PORT"))
+	if port == "" {
+		port = defaultPort
+	}
+
 	return &Config{
 		StripeWebhookSecret: os.Getenv("STRIPE_WEBHOOK_SECRET"),
+		Port:                port,
 	}, nil
 }

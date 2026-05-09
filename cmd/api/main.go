@@ -9,10 +9,17 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
+
+	"integration-engine/internal/config"
 )
 
 func main() {
-	addr := ":8080"
+	cfg, err := config.Load()
+	if err != nil {
+		log.Fatalf("config: %v", err)
+	}
+
+	addr := ":" + cfg.Port
 	handler := Recover(newMux())
 
 	// http.Server is the long-lived server value. Using it (instead of
