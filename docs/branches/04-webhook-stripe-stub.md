@@ -4,15 +4,15 @@
 
 ## What we added
 
-- **`handleStripeWebhook`** in **`cmd/api/mux.go`**: **`http.MaxBytesReader`** (**1 MiB** cap), **`engine.ParseStripeEvent`**, **400** / **413** on bad input / oversize, **204** on success.
+- **`handleStripeWebhook`** in **`cmd/api/handlers.go`**: **`http.MaxBytesReader`** (**1 MiB** cap), **`engine.ParseStripeEvent`**, **400** / **413** on bad input / oversize, **204** on success.
 - **Logging:** **`event_id`**, **`type`**, **`body_bytes`**, **`stripe_signature_present`** (boolean only), **`remote_addr`** - no **`Stripe-Signature`** header value logged.
-- **`cmd/api/mux.go`**: **`newMux()`**, **`handleLivez`**, **`handleReadyz`**, **`Recover`** - **`main.go`** is lifecycle only.
-- **`cmd/api/webhook_test.go`**: **`apiHandler()`** = same stack as **`main`** (**`Recover(newMux())`**), **`ServeHTTP`** on Stripe and **`/livez`** cases.
-- **`PLAN.md`**: **`cmd/api` layout** note and Decision for **`newMux()`** evolution toward **`application`**.
+- **`cmd/api/app.go`**: **`App`**, **`routes()`**; **`cmd/api/handlers.go`** probe + webhook handlers; **`cmd/api/recover.go`** **`Recover`** - **`main.go`** is lifecycle + **`Recover(app.routes())`**.
+- **`cmd/api/webhook_test.go`**: **`apiHandler()`** = same stack as **`main`** (**`Recover(app.routes())`** with test **`App`**), **`ServeHTTP`** on Stripe and **`/livez`** cases.
+- **`PLAN.md`**: **`cmd/api` layout** note and evolution toward **`App`** + **`routes()`**.
 
 ## Files changed (high level)
 
-- **`cmd/api/mux.go`** (new), **`cmd/api/main.go`**, **`cmd/api/webhook_test.go`** (new), **`PLAN.md`**
+- **`cmd/api/handlers.go`**, **`cmd/api/app.go`**, **`cmd/api/main.go`**, **`cmd/api/webhook_test.go`** (new), **`PLAN.md`**
 
 ## How to verify
 

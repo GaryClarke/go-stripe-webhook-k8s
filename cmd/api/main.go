@@ -18,9 +18,10 @@ func main() {
 	if err != nil {
 		log.Fatalf("config: %v", err)
 	}
+	app := NewApp(cfg)
 
 	addr := ":" + cfg.Port
-	handler := Recover(newMux())
+	handler := Recover(app.routes())
 
 	// http.Server is the long-lived server value. Using it (instead of
 	// http.ListenAndServe alone) gives us Shutdown(), which Kubernetes expects

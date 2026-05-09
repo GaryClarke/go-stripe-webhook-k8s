@@ -57,13 +57,13 @@ Each milestone lists **what to learn**, **what changes in the repo**, and **how 
 
 **Note on readiness:** For v1, `/readyz` may match `/livez` until **Milestone 7** adds shared dependencies (e.g. DB/Redis) for idempotency. Document the chosen rule under [Decisions](#decisions) when it changes.
 
-**`cmd/api` layout:** HTTP routes are registered in **`newMux()`** (`cmd/api/mux.go`) so **`main`** only concerns server lifecycle and **`Recover`**, and tests reuse the same route table. **Future (around Milestone 2+):** introduce a small **`application`** struct holding **`*config.Config`** (and later downstream / queue clients), then either **`func (app *application) routes() http.Handler`** or **`newMux(app *application)`**, moving handlers to methods **`app.handleStripeWebhook`** so dependencies are explicit instead of package-level state.
+**`cmd/api` layout:** HTTP routes are registered on **`(*App).routes()`** (`cmd/api/app.go`); handlers live in **`cmd/api/handlers.go`**. **`main`** loads config, **`NewApp`**, **`Recover(app.routes())`**, and server lifecycle only. **Future:** pass more dependencies on **`App`** (e.g. downstream clients); **Stripe** verification uses **`app.cfg`** in branch **`8-stripe-webhook-verify`**.
 
 **Milestone 1 carry-forward notes (non-blocking):**
 
 - Prefer names like **`signaturePresent`** for **`Stripe-Signature`** until Milestone 2 actually **verifies** the signature (avoid **`sigOK`**-style names that imply validation).
 - **`maxStripeWebhookBody`** ( **`http.MaxBytesReader`** cap) is fine as a **constant** in Milestone 1; **Milestone 2** can load a limit from **config** if you want it tunable without a rebuild.
-- **`Recover`** cannot reliably turn a response into **500** if the handler **already wrote headers**; **`cmd/api/mux.go`** documents that next to **`http.Error`**. Acceptable for Milestone 1; plan to refine when you add response-wrapping middleware in **Milestone 6** (see that milestone).
+- **`Recover`** cannot reliably turn a response into **500** if the handler **already wrote headers**; **`cmd/api/recover.go`** documents that next to **`http.Error`**. Acceptable for Milestone 1; plan to refine when you add response-wrapping middleware in **Milestone 6** (see that milestone).
 
 ---
 
@@ -89,7 +89,7 @@ Each milestone lists **what to learn**, **what changes in the repo**, and **how 
 2. **`PORT`** with default **8080**.
 3. Require **`STRIPE_WEBHOOK_SECRET`** at startup (or wherever **`Load`** runs).
 4. **`DOWNSTREAM_URL`**: **optional** until outbound HTTP exists; do **not** fail startup for a var that has **no behaviour** unless you deliberately want a future hook.
-5. **`application`** struct (or equivalent) holding **`*config.Config`**; **`newMux(app *application)`** / **`app.handleStripeWebhook`** (see Milestone 1 layout note).
+5. **`App`** struct (or equivalent) holding **`*config.Config`**; **`(*App).routes()`** / **`app.handleStripeWebhook`** (see Milestone 1 layout note).
 6. Tests for config loading (missing var, default **`PORT`**, valid **`Load`**).
 7. Stripe signature verification after config is wired.
 
@@ -152,7 +152,7 @@ For a **remote** OpenShift experience without standing up AWS yourself, the [Red
 
 **Ordering:** This milestone sits **before idempotency** (Milestone 7) so logs help debug duplicate delivery and storage behaviour.
 
-**Recover / partial response (deferred from Milestone 1):** If a handler **panics after** it has already started the response (e.g. **`WriteHeader`** or body bytes on the wire), **`http.Error`** in **`Recover`** cannot reliably turn the client-visible outcome into **500** - see the comment on **`Recover`** in **`cmd/api/mux.go`**. When you add **response-wrapping** middleware here (logging, correlation IDs, body capture), revisit **`Recover`**: e.g. track whether the response has started and **log only** after that point, or use patterns built around **`http.ResponseWriter`** / **`http.ResponseController`** so panic handling does not double-write or corrupt the stream.
+**Recover / partial response (deferred from Milestone 1):** If a handler **panics after** it has already started the response (e.g. **`WriteHeader`** or body bytes on the wire), **`http.Error`** in **`Recover`** cannot reliably turn the client-visible outcome into **500** - see the comment on **`Recover`** in **`cmd/api/recover.go`**. When you add **response-wrapping** middleware here (logging, correlation IDs, body capture), revisit **`Recover`**: e.g. track whether the response has started and **log only** after that point, or use patterns built around **`http.ResponseWriter`** / **`http.ResponseController`** so panic handling does not double-write or corrupt the stream.
 
 ---
 
@@ -187,7 +187,7 @@ Record short, dated bullets as you go (examples below).
 - *Example:* YYYY-MM-DD — `/readyz` equals process up until Redis is required.
 - *Example:* YYYY-MM-DD — Standardise on port 8080 for app, Service targetPort, and examples.
 - **2026-05-06** - **Milestone 6 = Observability**, **Milestone 7 = Idempotency** (swap so logs aid debugging idempotency work).
-- **2026-05-06** - HTTP routes live in **`cmd/api` `newMux()`**; evolve toward **`application` struct + `routes()`** when **Milestone 2** config lands (see Milestone 1 layout note).
+- **2026-05-06** - HTTP routes live in **`cmd/api` `(*App).routes()`** and **`handlers.go`**; **`App`** holds **`*config.Config`** for **`8-stripe-webhook-verify`** and beyond (see Milestone 1 layout note).
 - **2026-05-07** - **`internal/dbg.DD`**: **`//go:build debug`** implementation (**`spew`** + **`os.Exit(1)`**); **`//go:build !debug`** no-op for release. Optional scratch filename **`zzz_stripe_webhook_k8s_dd_scratch_only.go`** is for personal global gitignore only, not a committed artefact.
 - **2026-05-08** - **Milestone 1** marked **complete** on **`main`**; **Milestone 2** **approved** shape: **`6-milestone-2-config`** or **`6-config-env`**, **`Load`**, fail-fast **`STRIPE_WEBHOOK_SECRET`**, **`PORT`** default **8080**, **`application` struct + config**, tests, then **Stripe** signature verification; **`DOWNSTREAM_URL`** **optional**/deferred until used. **Observability** (**Milestone 6**) before **idempotency** (**Milestone 7**); cluster **Secrets** / **`securityContext`** stay **Milestones 3–4** (no change).
 

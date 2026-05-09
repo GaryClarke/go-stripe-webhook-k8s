@@ -5,11 +5,17 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"integration-engine/internal/config"
 )
 
 // apiHandler matches main: panic recovery wraps the mux (same stack as production).
 func apiHandler() http.Handler {
-	return Recover(newMux())
+	app := NewApp(&config.Config{
+		StripeWebhookSecret: "whsec_test",
+		Port:                 "8080",
+	})
+	return Recover(app.routes())
 }
 
 func TestAPI_StripeWebhook_ValidJSON_NoContent(t *testing.T) {
