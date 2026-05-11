@@ -1,27 +1,81 @@
 package main
 
 import (
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 
+	"github.com/stripe/stripe-go/v85"
+
 	"integration-engine/internal/config"
 )
+
+const testWebhookSecret = "whsec_test"
 
 // apiHandler matches main: panic recovery wraps the mux (same stack as production).
 func apiHandler() http.Handler {
 	app := NewApp(&config.Config{
-		StripeWebhookSecret: "whsec_test",
-		Port:                 "8080",
+		StripeWebhookSecret: testWebhookSecret,
+		Port:                "8080",
 	})
 	return Recover(app.routes())
+}
+
+// validStripeWebhookJSON is JSON ConstructEvent accepts for testWebhookSecret when paired with a valid Stripe-Signature.
+func validStripeWebhookJSON() string {
+	return fmt.Sprintf(
+		`{"id":"evt_test_123","type":"invoice.payment_succeeded","object":"event","api_version":%q}`,
+		stripe.APIVersion,
+	)
+}
+
+// newSignedStripeWebhookRequest builds a POST /webhooks/stripe request with a valid
+// Stripe-Signature for testWebhookSecret (see stripe.GenerateTestSignedPayload).
+func newSignedStripeWebhookRequest(body string) *http.Request {
+	p := stripe.GenerateTestSignedPayload(&stripe.UnsignedPayload{
+		Payload: []byte(body),
+		Secret:  testWebhookSecret,
+	})
+	req := httptest.NewRequest(http.MethodPost, "/webhooks/stripe", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Stripe-Signature", p.Header)
+	return req
 }
 
 func TestAPI_StripeWebhook_ValidJSON_NoContent(t *testing.T) {
 	t.Parallel()
 
-	body := `{"id":"evt_test_123","type":"invoice.payment_succeeded","object":"event"}`
+	req := newSignedStripeWebhookRequest(validStripeWebhookJSON())
+
+	rec := httptest.NewRecorder()
+	apiHandler().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusNoContent)
+	}
+}
+
+func TestAPI_StripeWebhook_MissingSignature_BadRequest(t *testing.T) {
+	t.Parallel()
+
+	body := validStripeWebhookJSON()
+	req := httptest.NewRequest(http.MethodPost, "/webhooks/stripe", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+
+	rec := httptest.NewRecorder()
+	apiHandler().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d (missing Stripe-Signature must not succeed)", rec.Code, http.StatusBadRequest)
+	}
+}
+
+func TestAPI_StripeWebhook_InvalidSignature_BadRequest(t *testing.T) {
+	t.Parallel()
+
+	body := validStripeWebhookJSON()
 	req := httptest.NewRequest(http.MethodPost, "/webhooks/stripe", strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Stripe-Signature", "t=1,v1=fake")
@@ -29,8 +83,8 @@ func TestAPI_StripeWebhook_ValidJSON_NoContent(t *testing.T) {
 	rec := httptest.NewRecorder()
 	apiHandler().ServeHTTP(rec, req)
 
-	if rec.Code != http.StatusNoContent {
-		t.Fatalf("status = %d, want %d", rec.Code, http.StatusNoContent)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d (invalid Stripe-Signature must not succeed)", rec.Code, http.StatusBadRequest)
 	}
 }
 

@@ -7,7 +7,7 @@ import (
 	"log"
 	"net/http"
 
-	"integration-engine/internal/engine"
+	"github.com/stripe/stripe-go/v85"
 )
 
 // healthResponse is used for probe-style JSON bodies (livez, readyz).
@@ -48,17 +48,17 @@ func (app *App) handleStripeWebhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ev, err := engine.ParseStripeEvent(body)
+	sigHeader := r.Header.Get("Stripe-Signature")
+	ev, err := stripe.ConstructEvent(body, sigHeader, app.cfg.StripeWebhookSecret)
 	if err != nil {
+		// Stripe's webhook examples use 400 for invalid payload / signature verification failures.
 		log.Printf("webhooks/stripe: %v", err)
 		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 		return
 	}
 
-	// Log whether the Stripe-Signature header is present; never log the value (verification comes in Milestone 2).
-	signaturePresent := r.Header.Get("Stripe-Signature") != ""
-	log.Printf("webhooks/stripe: event_id=%q type=%q body_bytes=%d stripe_signature_present=%v remote_addr=%s",
-		ev.ID, ev.Type, len(body), signaturePresent, r.RemoteAddr)
+	log.Printf("webhooks/stripe: event_id=%q type=%q body_bytes=%d remote_addr=%s",
+		ev.ID, ev.Type, len(body), r.RemoteAddr)
 
 	w.WriteHeader(http.StatusNoContent)
 }

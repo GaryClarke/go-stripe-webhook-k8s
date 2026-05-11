@@ -53,11 +53,11 @@ Each milestone lists **what to learn**, **what changes in the repo**, and **how 
 
 **Local-only scratch files:** If you add throwaway **`*.go`** snippets for experiments, use a dedicated name and list it in **your** global gitignore so it is never committed. This repo documents the convention as **`zzz_stripe_webhook_k8s_dd_scratch_only.go`** (unlikely to collide with normal source names; avoid a leading dot on the basename so the Go toolchain still compiles the file when you want it to).
 
-**Milestone 1 status:** Complete on **`main`**: probes, webhook stub, graceful shutdown, **`Recover`**, **`internal/dbg`**, tests including **`TestAPI_Readyz`**. Proceed to **Milestone 2** on a **`6-*`** branch (see [Milestone 2](#milestone-2-configuration-and-secrets)).
+**Milestone 1 status:** Complete on **`main`**: probes, webhook stub, graceful shutdown, **`Recover`**, **`internal/dbg`**, tests including **`TestAPI_Readyz`**. **Milestone 2** verification landed on **`8-stripe-webhook-verify`** (see [Milestone 2](#milestone-2-configuration-and-secrets)).
 
 **Note on readiness:** For v1, `/readyz` may match `/livez` until **Milestone 7** adds shared dependencies (e.g. DB/Redis) for idempotency. Document the chosen rule under [Decisions](#decisions) when it changes.
 
-**`cmd/api` layout:** HTTP routes are registered on **`(*App).routes()`** (`cmd/api/app.go`); handlers live in **`cmd/api/handlers.go`**. **`main`** loads config, **`NewApp`**, **`Recover(app.routes())`**, and server lifecycle only. **Future:** pass more dependencies on **`App`** (e.g. downstream clients); **Stripe** verification uses **`app.cfg`** in branch **`8-stripe-webhook-verify`**.
+**`cmd/api` layout:** HTTP routes are registered on **`(*App).routes()`** (`cmd/api/app.go`); handlers live in **`cmd/api/handlers.go`**. **`main`** loads config, **`NewApp`**, **`Recover(app.routes())`**, and server lifecycle only. **`POST /webhooks/stripe`** uses **`app.cfg.StripeWebhookSecret`** with **`stripe.ConstructEvent`**. **Future:** pass more dependencies on **`App`** (e.g. downstream clients).
 
 **Milestone 1 carry-forward notes (non-blocking):**
 
@@ -75,11 +75,13 @@ Each milestone lists **what to learn**, **what changes in the repo**, and **how 
 | **Build** | HTTP API config: **`PORT`** (default **8080**), required **`STRIPE_WEBHOOK_SECRET`**, webhook **signature verification** on the raw body; fail fast when **required** vars are missing. **`DOWNSTREAM_URL`** only when the app actually calls downstream (otherwise **optional** or **deferred** - see notes). Reuse or extend **`internal/config`** as needed (a Lambda-era **`Load()`** may already exist - evolve it for **`cmd/api`** rather than duplicating loaders). |
 | **Done when** | App reads config from the environment; **missing required config fails fast with a clear error**; invalid Stripe signatures rejected with an appropriate HTTP status. |
 
+**Milestone 2 status:** Complete on **`8-stripe-webhook-verify`**: required **`STRIPE_WEBHOOK_SECRET`** and **`PORT`** (default **8080**) from **`internal/config`**; **`stripe.ConstructEvent`** on the raw body and **`Stripe-Signature`** header; **400** on invalid payload or verification failure (aligned with Stripe's webhook examples); tests cover valid signed requests, missing signature, and invalid signature. Proceed to **Milestone 3** ([Containerise](#milestone-3-containerise)).
+
 **Logging:** Keep **simple** `log` lines for important paths (e.g. webhook received, config load failures). **Structured JSON** and **correlation IDs** are **Milestone 6**.
 
-**Stripe webhook verification:** Verify **`Stripe-Signature`** against the **raw request body** (the same bytes Stripe signed). The Milestone 1 handler already reads **`body`** before **`ParseStripeEvent`**, which is the right order for plugging in verification in Milestone 2.
+**Stripe webhook verification:** Use **`stripe.ConstructEvent(body, stripeSignatureHeader, webhookSecret)`** from **`github.com/stripe/stripe-go/v85`** so verification runs on the **same raw bytes** read from **`r.Body`** (after **`http.MaxBytesReader`**).
 
-**Git branch (suggested names):** **`6-milestone-2-config`** or **`6-config-env`**.
+**Git branch (suggested names):** Config work may use **`6-milestone-2-config`** or **`6-config-env`**; this repo completed verification on **`8-stripe-webhook-verify`**.
 
 **Primary target:** load config from the environment and **fail fast** when **required** variables are missing.
 
@@ -187,9 +189,10 @@ Record short, dated bullets as you go (examples below).
 - *Example:* YYYY-MM-DD — `/readyz` equals process up until Redis is required.
 - *Example:* YYYY-MM-DD — Standardise on port 8080 for app, Service targetPort, and examples.
 - **2026-05-06** - **Milestone 6 = Observability**, **Milestone 7 = Idempotency** (swap so logs aid debugging idempotency work).
-- **2026-05-06** - HTTP routes live in **`cmd/api` `(*App).routes()`** and **`handlers.go`**; **`App`** holds **`*config.Config`** for **`8-stripe-webhook-verify`** and beyond (see Milestone 1 layout note).
+- **2026-05-06** - HTTP routes live in **`cmd/api` `(*App).routes()`** and **`handlers.go`**; **`App`** holds **`*config.Config`** (see Milestone 1 layout note).
 - **2026-05-07** - **`internal/dbg.DD`**: **`//go:build debug`** implementation (**`spew`** + **`os.Exit(1)`**); **`//go:build !debug`** no-op for release. Optional scratch filename **`zzz_stripe_webhook_k8s_dd_scratch_only.go`** is for personal global gitignore only, not a committed artefact.
 - **2026-05-08** - **Milestone 1** marked **complete** on **`main`**; **Milestone 2** **approved** shape: **`6-milestone-2-config`** or **`6-config-env`**, **`Load`**, fail-fast **`STRIPE_WEBHOOK_SECRET`**, **`PORT`** default **8080**, **`application` struct + config**, tests, then **Stripe** signature verification; **`DOWNSTREAM_URL`** **optional**/deferred until used. **Observability** (**Milestone 6**) before **idempotency** (**Milestone 7**); cluster **Secrets** / **`securityContext`** stay **Milestones 3–4** (no change).
+- **2026-05-08** - **`8-stripe-webhook-verify`**: **`stripe.ConstructEvent`** for **`POST /webhooks/stripe`**; **400** on missing / invalid **`Stripe-Signature`** or bad payload; tests use **`stripe.GenerateTestSignedPayload`**.
 
 ---
 
