@@ -21,6 +21,7 @@ Add a row when you open or complete a branch.
 | `3-recover-panic` | [03-recover-panic.md](03-recover-panic.md) | `Recover` middleware, `httptest`, no debug `/panic` route |
 | `4-webhook-stripe-stub` | [04-webhook-stripe-stub.md](04-webhook-stripe-stub.md) | `POST /webhooks/stripe`, handlers + mux wiring, `ParseStripeEvent`, `apiHandler` tests |
 | `5-add-dbg-dd` | [05-add-dbg-dd.md](05-add-dbg-dd.md) | `internal/dbg.DD`, `go-spew`, `//go:build debug` / `!debug` split |
+| `7-api-application-wire` | [07-api-application-wire.md](07-api-application-wire.md) | `App` + `NewApp`, `routes()` on `ServeMux`, `handlers.go`, `Recover` in `main` and `apiHandler` tests |
 | `8-stripe-webhook-verify` | [08-stripe-webhook-verify.md](08-stripe-webhook-verify.md) | `stripe.ConstructEvent` on raw body + `Stripe-Signature`; **400** on failure; signed payload tests |
 
 **Doc template:** mirror the style in [original-branches](../original-branches/README.md): goal, scope, key files, how to verify, follow-ups.

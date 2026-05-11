@@ -14,7 +14,6 @@ func NewApp(cfg *config.Config) *App {
 }
 
 // routes registers all HTTP handlers on a ServeMux. Tests and production use the same wiring.
-// Stripe signature verification will use app.cfg in a later branch; see PLAN.md Milestone 2.
 func (app *App) routes() *http.ServeMux {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /livez", app.handleLivez)
