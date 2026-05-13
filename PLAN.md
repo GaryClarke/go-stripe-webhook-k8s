@@ -61,8 +61,7 @@ Each milestone lists **what to learn**, **what changes in the repo**, and **how 
 
 **Milestone 1 carry-forward notes (non-blocking):**
 
-- Prefer names like **`signaturePresent`** for **`Stripe-Signature`** until Milestone 2 actually **verifies** the signature (avoid **`sigOK`**-style names that imply validation).
-- **`maxStripeWebhookBody`** ( **`http.MaxBytesReader`** cap) is fine as a **constant** in Milestone 1; **Milestone 2** can load a limit from **config** if you want it tunable without a rebuild.
+- **`maxStripeWebhookBody`** ( **`http.MaxBytesReader`** cap) is fine as a **constant** in Milestone 1; a later milestone can load a limit from **config** if you want it tunable without a rebuild.
 - **`Recover`** cannot reliably turn a response into **500** if the handler **already wrote headers**; **`cmd/api/recover.go`** documents that next to **`http.Error`**. Acceptable for Milestone 1; plan to refine when you add response-wrapping middleware in **Milestone 6** (see that milestone).
 
 ---
@@ -103,9 +102,13 @@ Each milestone lists **what to learn**, **what changes in the repo**, and **how 
 
 | | |
 |--|--|
-| **Learn** | Dockerfile; multi-stage builds; **non-root user** and minimal image basics (prepares for **Pod securityContext** in Milestone 4). |
-| **Build** | `Dockerfile`, `.dockerignore`. Image must run as **non-root** if you want **`runAsNonRoot: true`** on the Deployment without fighting the runtime. |
-| **Done when** | `docker build` and `docker run` (with env file or `-e`) expose the API and health endpoints on the expected port. |
+| **Learn** | Dockerfile; multi-stage builds; **non-root user** and minimal image basics (prepares for **Pod securityContext** in Milestone 4). Publishing an image from **GitHub Actions** to an **OCI registry** (auth via repo secrets). |
+| **Build** | `Dockerfile`, `.dockerignore`. Image must run as **non-root** if you want **`runAsNonRoot: true`** on the Deployment without fighting the runtime. Extend **`.github/workflows`** (e.g. existing **CI** workflow) so pushes to **`main`** **build** the container image and **push** it to a chosen registry (**GHCR**, **ECR**, **Docker Hub**, etc.). Document image name / tag convention and which **secrets** the workflow needs (**not** committed). Keep existing **Go** jobs (**`go build`**, **`go test`**, lint) as gates before or alongside the image job. |
+| **Done when** | **(1)** **`docker build`** and **`docker run`** (with **`.env`**, **`--env-file`**, or **`-e STRIPE_WEBHOOK_SECRET=...`**) expose the API and health endpoints on the expected port (unsigned webhook **POST**s should **fail** with **400**; see Milestone 2). **(2)** A workflow run on **`main`** **builds** the same **`Dockerfile`** and **pushes** a tagged image to your registry (repo **secrets** configured); existing **Go** jobs remain green. |
+
+**Current repo note:** **`Dockerfile`** and **`.dockerignore`** may land before the **CI image** job; both **(1)** and **(2)** are required to mark Milestone 3 **complete**.
+
+**Out of scope for this milestone (stretch later):** multi-environment promotion pipelines (dev → staging → prod), deploy steps per env, and post-deploy smoke beyond what you already run in CI. **Milestone 4** can still load the image locally (**`kind load`**, etc.); a registry makes **Phase B** (remote cluster pulls the same image) straightforward.
 
 **Optional stretch:** If you aim for **`readOnlyRootFilesystem: true`** later, ensure the process needs **no writable layer** (or add a documented `emptyDir` mount when you hit that in Milestone 4).
 
@@ -193,6 +196,7 @@ Record short, dated bullets as you go (examples below).
 - **2026-05-07** - **`internal/dbg.DD`**: **`//go:build debug`** implementation (**`spew`** + **`os.Exit(1)`**); **`//go:build !debug`** no-op for release. Optional scratch filename **`zzz_stripe_webhook_k8s_dd_scratch_only.go`** is for personal global gitignore only, not a committed artefact.
 - **2026-05-08** - **Milestone 1** marked **complete** on **`main`**; **Milestone 2** **approved** shape: **`6-milestone-2-config`** or **`6-config-env`**, **`Load`**, fail-fast **`STRIPE_WEBHOOK_SECRET`**, **`PORT`** default **8080**, **`application` struct + config**, tests, then **Stripe** signature verification; **`DOWNSTREAM_URL`** **optional**/deferred until used. **Observability** (**Milestone 6**) before **idempotency** (**Milestone 7**); cluster **Secrets** / **`securityContext`** stay **Milestones 3–4** (no change).
 - **2026-05-08** - **`8-stripe-webhook-verify`**: **`stripe.ConstructEvent`** for **`POST /webhooks/stripe`**; **400** on missing / invalid **`Stripe-Signature`** or bad payload; tests use **`stripe.GenerateTestSignedPayload`**.
+- **2026-05-13** - **Milestone 3** includes **GitHub Actions** **build + push** of the container image to an **OCI registry** (cohesive with **`Dockerfile`** / **`.dockerignore`**); **multi-env deploy** stays **stretch** / later.
 
 ---
 

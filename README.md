@@ -50,14 +50,18 @@ make lint
 
 ## Docker (Milestone 3)
 
-After the `Dockerfile` is added:
+From the repo root (see **`.dockerignore`** for what enters the build context):
 
 ```bash
 docker build -t go-stripe-webhook-k8s .
 docker run --rm -p 8080:8080 --env-file .env go-stripe-webhook-k8s
+# or without a file, for a quick check:
+# docker run --rm -p 8080:8080 -e STRIPE_WEBHOOK_SECRET=whsec_test go-stripe-webhook-k8s
 ```
 
-Adjust image name, port, and env file path to match your setup.
+Adjust image name, port, and env file path to match your setup. On **Apple Silicon**, use **`docker build --platform linux/arm64 ...`** if you want a native **arm64** image (the **`Dockerfile`** uses **`TARGETARCH`**).
+
+**CI:** **`.github/workflows/ci.yaml`** runs **`go build`**, **`go test`**, and **`make lint`** on pushes to **`main`**. Per **[PLAN.md — Milestone 3](PLAN.md#milestone-3-containerise)**, add a job that **builds and pushes** this image to your registry (secrets in GitHub, not in git). Multi-environment deploy stays optional stretch.
 
 ## Kubernetes (Milestones 4–5)
 
@@ -66,7 +70,7 @@ Adjust image name, port, and env file path to match your setup.
 - Apply manifests under `k8s/` (and OpenShift `Route` under `openshift/` when present).
 - Use `kubectl port-forward` to reach the Service from your machine until an Ingress or Route is configured.
 
-**Later (optional):** Push the image to a registry and target a remote cluster (e.g. OpenShift Developer Sandbox before EKS). The Go service, Dockerfile, and manifests do not need redesign—only image delivery and cluster credentials. See [PLAN.md — Deployment phases](PLAN.md#deployment-phases).
+**Later (optional):** Target a **remote** cluster (**Phase B**, e.g. OpenShift Developer Sandbox) that **pulls** the image your CI publishes (**Milestone 3**). Same **Dockerfile** and manifests; add registry credentials and **kubeconfig** as needed. See [PLAN.md — Deployment phases](PLAN.md#deployment-phases).
 
 Details and ordering: [PLAN.md](PLAN.md).
 
@@ -74,6 +78,8 @@ Details and ordering: [PLAN.md](PLAN.md).
 
 | Path | Role |
 |------|------|
+| `Dockerfile` | Multi-stage image: **`cmd/api`** binary on **distroless**, non-root. |
+| `.dockerignore` | Keeps Docker build context small; see [Milestone 3](PLAN.md#milestone-3-containerise). |
 | `cmd/api` | HTTP service entrypoint for local and container runs. |
 | `internal/` | Shared packages (config, engine, dbg, etc.). |
 | `testdata/` | Stripe webhook fixtures. |

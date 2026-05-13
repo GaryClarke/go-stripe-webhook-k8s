@@ -1,0 +1,49 @@
+# Git and CI (not needed to compile the binary)
+.git/
+.github/
+
+# Documentation and planning (large; not used by go build)
+docs/
+README.md
+PLAN.md
+cursor-rules.md
+
+# Other trees in this learning repo (not imported by cmd/api)
+downstream/
+terraform/
+
+# Test fixtures and test sources (not required for go build ./cmd/api)
+testdata/
+**/*_test.go
+
+# Local env and secrets (never bake into context)
+.env
+.env.*
+*.local
+
+# Go tooling / artifacts (mirror .gitignore)
+bin/
+dist/
+build/
+vendor/
+*.test
+*.out
+go.work
+
+# Terraform / IaC state if present under repo root
+.terraform/
+*.tfstate
+*.tfstate.*
+.terraform.lock.hcl
+
+# IDE and OS noise
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Meta (lint config not needed inside image build context)
+.golangci.yml
+Makefile
