@@ -33,4 +33,4 @@ Use this file as guardrails for AI and humans working in this repo. Keep it upda
 ## Infra (when we add it)
 
 - **Kubernetes:** Manifests under **`k8s/`** (and **`openshift/`** for routes). See **[PLAN.md](PLAN.md)**.
-- **`terraform/`** in the tree is **legacy AWS** from the parent project; it is not on the default CI path for this fork.
+- **Legacy `terraform/`** (Lambda + API Gateway from the parent project) is **removed** from this fork once **`10-terraform-ecr-github-oidc`** lands; new **IaC** for **ECR** + **GitHub OIDC** lives under an agreed path (e.g. **`infra/terraform/`**). See **Milestone 3** in **[PLAN.md](PLAN.md)**.
