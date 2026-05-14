@@ -116,9 +116,11 @@ Each milestone lists **what to learn**, **what changes in the repo**, and **how 
 
 ## Milestone 4: First Kubernetes deploy
 
+**Background first (lesson):** Before writing YAML, walk through a **full orientation**: what **Kubernetes** is (and how it differs from **ECS** and from **EKS**); **control plane** vs **nodes** / **kubelet**; **Pods**, **ReplicaSet/Deployment**, **Service**, **Namespace**; **declarative manifests** and **`kubectl apply`**; **container image** + **`imagePullPolicy`** vs **local** **`kind load`**; **probes** and why they matter for your **`/livez`** / **`/readyz`**; **Secrets** vs **ConfigMaps**. That can be an in-chat deep dive, a short doc under **`docs/`** (add a file when you open this milestone), or both. **Then** implement the **`k8s/`** list below so each object ties back to that mental model.
+
 | | |
 |--|--|
-| **Learn** | Pod, Deployment, Service; probes; **Secrets** wiring; **resource requests/limits**; **Pod `securityContext`** (OpenShift-friendly); port alignment (`containerPort` ↔ `Service` ↔ `port-forward`). |
+| **Learn** | Same as the orientation above, then in practice: Pod, Deployment, Service; probes; **Secrets** wiring; **resource requests/limits**; **Pod `securityContext`** (OpenShift-friendly); port alignment (`containerPort` ↔ `Service` ↔ `port-forward`). |
 | **Build** | Core YAML under `k8s/` (see list below). |
 | **Done when** | On a **local** Kubernetes cluster (Docker Desktop, Minikube, or kind): `kubectl apply -f k8s/`, pods ready, `kubectl port-forward svc/...` reaches webhook and health URLs; Secret-backed config is **documented** and **safe for git**. |
 
