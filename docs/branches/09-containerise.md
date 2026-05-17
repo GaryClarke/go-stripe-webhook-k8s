@@ -25,5 +25,5 @@ curl -sS http://localhost:8080/livez
 
 ## Follow-ups
 
-- **Milestone 3:** **`10-terraform-ecr-github-oidc`** (Terraform **OIDC** + **IAM** + **ECR**); **`11-gh-actions-ecr-push`** (**GHA** image build + push). See **[PLAN.md](../../PLAN.md)**.
+- **Milestone 3:** **`10-terraform-ecr-github-oidc`** (Terraform **OIDC** + **IAM** + **ECR**) - see **[10-terraform-ecr-github-oidc.md](10-terraform-ecr-github-oidc.md)**; then **`11-gh-actions-ecr-push`** (**GHA** image build + push). See **[PLAN.md](../../PLAN.md)**.
 - **Milestone 4:** **`k8s/`** manifests and local cluster apply.

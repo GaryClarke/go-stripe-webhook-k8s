@@ -80,6 +80,7 @@ Details and ordering: [PLAN.md](PLAN.md).
 |------|------|
 | `Dockerfile` | Multi-stage image: **`cmd/api`** binary on **distroless**, non-root. |
 | `.dockerignore` | Keeps Docker build context small; see [Milestone 3](PLAN.md#milestone-3-containerise). |
+| `infra/terraform/` | IaC for **ECR** + **GitHub OIDC** IAM for CI image push; run Terraform only from this directory. Outputs (role ARN, registry URL) after **`apply`**: see **[docs/branches/10-terraform-ecr-github-oidc.md](docs/branches/10-terraform-ecr-github-oidc.md)**. |
 | `cmd/api` | HTTP service entrypoint for local and container runs. |
 | `internal/` | Shared packages (config, engine, dbg, etc.). |
 | `testdata/` | Stripe webhook fixtures. |
