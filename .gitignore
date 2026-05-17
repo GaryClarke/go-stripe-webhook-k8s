@@ -25,11 +25,12 @@ build
 .env.local
 *.local
 
-# Terraform (when added)
+# Terraform (plugin cache and local state files)
+# Commit .terraform.lock.hcl in versioned roots (e.g. infra/terraform/) so CI
+# and teammates resolve the same provider versions. See: dependency lock file.
 .terraform/
 *.tfstate
 *.tfstate.*
-.terraform.lock.hcl
 
 # Lessons (personal learning notes, repeatable steps)
 lessons/
