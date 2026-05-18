@@ -117,6 +117,8 @@ Each milestone lists **what to learn**, **what changes in the repo**, and **how 
 
 **Optional stretch:** If you aim for **`readOnlyRootFilesystem: true`** later, ensure the process needs **no writable layer** (or add a documented `emptyDir` mount when you hit that in Milestone 4).
 
+**Later / clarification (no action required for Milestone 3):** After **`aws ecr get-login-password | docker login ...`** to **ECR**, the Docker CLI sometimes prints a generic warning about using a **personal access token** (**Docker Hub**). That message is **not** about **AWS ECR**. **ECR** uses a **short-lived** registry password from **AWS**; access control is **IAM** (who may call **GetAuthorizationToken** / push), not Docker Hub PATs. Revisit only if we want a one-liner in **README** for newcomers.
+
 **Milestone 3 status:** **(1)** done on **`main`** (**`9-containerise`**). **(2)** done on **`main`** (**`10-terraform-ecr-github-oidc`**, Terraform applied in the learning account). **(3)** **`11-gh-actions-ecr-push`** adds the **ECR** push job - treat **Milestone 3** as fully satisfied once **`11`** is on **`main`**, **Actions** is green, and **ECR** shows the new image tag(s).
 
 ---
