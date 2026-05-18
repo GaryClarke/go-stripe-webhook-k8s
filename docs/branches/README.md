@@ -25,6 +25,7 @@ Add a row when you open or complete a branch.
 | `8-stripe-webhook-verify` | [08-stripe-webhook-verify.md](08-stripe-webhook-verify.md) | `stripe.ConstructEvent` on raw body + `Stripe-Signature`; **400** on failure; signed payload tests |
 | `9-containerise` | [09-containerise.md](09-containerise.md) | `Dockerfile` + `.dockerignore`, distroless non-root image; PLAN/README Milestone 3 |
 | `10-terraform-ecr-github-oidc` | [10-terraform-ecr-github-oidc.md](10-terraform-ecr-github-oidc.md) | `infra/terraform/`: ECR, GitHub OIDC + IAM role for CI ECR push; remote state; drop legacy `terraform/` |
+| `11-gh-actions-ecr-push` | [11-gh-actions-ecr-push.md](11-gh-actions-ecr-push.md) | CI: OIDC to AWS, buildx, push to ECR (`github.sha` + `latest`); Go jobs unchanged as gates |
 
 **Doc template:** mirror the style in [original-branches](../original-branches/README.md): goal, scope, key files, how to verify, follow-ups.
 

@@ -117,6 +117,8 @@ Each milestone lists **what to learn**, **what changes in the repo**, and **how 
 
 **Optional stretch:** If you aim for **`readOnlyRootFilesystem: true`** later, ensure the process needs **no writable layer** (or add a documented `emptyDir` mount when you hit that in Milestone 4).
 
+**Milestone 3 status:** **(1)** done on **`main`** (**`9-containerise`**). **(2)** done on **`main`** (**`10-terraform-ecr-github-oidc`**, Terraform applied in the learning account). **(3)** **`11-gh-actions-ecr-push`** adds the **ECR** push job - treat **Milestone 3** as fully satisfied once **`11`** is on **`main`**, **Actions** is green, and **ECR** shows the new image tag(s).
+
 ---
 
 ## Milestone 4: First Kubernetes deploy

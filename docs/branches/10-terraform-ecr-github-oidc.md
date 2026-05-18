@@ -36,5 +36,5 @@ terraform output -raw ecr_repository_url
 
 ## Follow-ups
 
-- **`11-gh-actions-ecr-push`:** GitHub Actions **OIDC** - **`configure-aws-credentials`**, ECR login, **`docker buildx`** push (see **[PLAN.md](../../PLAN.md)** Milestone 3).
+- **CI ECR push:** **[11-gh-actions-ecr-push.md](11-gh-actions-ecr-push.md)** (**`11-gh-actions-ecr-push`**) - **OIDC**, **`configure-aws-credentials`**, ECR login, **`docker buildx`** push ( **[PLAN.md](../../PLAN.md)** Milestone 3).
 - If the **OIDC provider** already existed in this AWS account, **`apply`** would have failed; use import or a **`data`** block (see comment at top of **`infra/terraform/main.tf`**).

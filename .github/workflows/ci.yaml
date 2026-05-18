@@ -1,10 +1,24 @@
-# CI runs on every push to main. Jobs: compile check, tests, lint.
-# Legacy AWS Terraform/Lambda lives under terraform/ but is not built here.
+# CI on every push to main:
+#   - Go: build, test, lint (unchanged idea).
+#   - Container: build image with buildx and push to ECR (OIDC, no long-lived AWS keys in secrets).
+#
+# Prerequisites in GitHub (repo Settings -> Secrets and variables -> Actions -> Variables):
+#   AWS_ROLE_ARN = arn:aws:iam::<ACCOUNT_ID>:role/<role-name>  (from: terraform output -raw github_actions_role_arn)
+# Optional variables if you do not want literals in the workflow:
+#   AWS_REGION = eu-west-1
+#   ECR_REPOSITORY = go-stripe-webhook-k8s
+#
+# IAM trust policy (Terraform) must allow this repo + refs/heads/main so the OIDC token matches.
 name: CI
 
 on:
     push:
         branches: [main]
+
+# Default: read repo contents. OIDC needs id-token: write for configure-aws-credentials.
+permissions:
+    contents: read
+    id-token: write
 
 jobs:
     # Quick compile check: does all Go code build? No artifact produced.
@@ -13,11 +27,9 @@ jobs:
         runs-on: ubuntu-latest
         steps:
             - uses: actions/checkout@v4
-
             - uses: actions/setup-go@v5
               with:
                   go-version: "1.26"
-
             - name: Build
               run: go build ./...
 
@@ -26,11 +38,9 @@ jobs:
         runs-on: ubuntu-latest
         steps:
             - uses: actions/checkout@v4
-
             - uses: actions/setup-go@v5
               with:
                   go-version: "1.26"
-
             - name: Test
               run: go test ./...
 
@@ -39,10 +49,47 @@ jobs:
         runs-on: ubuntu-latest
         steps:
             - uses: actions/checkout@v4
-
             - uses: actions/setup-go@v5
               with:
                   go-version: "1.26"
-
             - name: Lint
               run: make lint
+
+    # Docker image: only after Go checks pass (same commit via checkout in this job).
+    push-ecr:
+        runs-on: ubuntu-latest
+        needs: [build, test, lint]
+        steps:
+            - uses: actions/checkout@v4
+
+            # Exchange GitHub OIDC token for temporary AWS credentials for the IAM role Terraform created.
+            - name: Configure AWS credentials (OIDC)
+              uses: aws-actions/configure-aws-credentials@v4
+              with:
+                  role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+                  aws-region: ${{ vars.AWS_REGION || 'eu-west-1' }}
+
+            # Sets docker auth for the account ECR registry used by builds in this job.
+            - name: Login to Amazon ECR
+              id: ecr
+              uses: aws-actions/amazon-ecr-login@v2
+
+            # buildx is needed for a clean "build and push" in CI (matches PLAN.md buildx wording).
+            - name: Set up Docker Buildx
+              uses: docker/setup-buildx-action@v3
+
+            # Single-platform default: linux/amd64 (what most EKS/Graviton mix expects; adjust if you need arm too).
+            - name: Build and push image
+              env:
+                  REGISTRY: ${{ steps.ecr.outputs.registry }}
+                  REPOSITORY: ${{ vars.ECR_REPOSITORY || 'go-stripe-webhook-k8s' }}
+                  IMAGE_TAG: ${{ github.sha }}
+              run: |
+                  docker buildx build \
+                  --platform linux/amd64 \
+                  --provenance=false \
+                  --sbom=false \
+                  -t "${REGISTRY}/${REPOSITORY}:${IMAGE_TAG}" \
+                  -t "${REGISTRY}/${REPOSITORY}:latest" \
+                  --push \
+                  .

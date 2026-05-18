@@ -61,7 +61,7 @@ docker run --rm -p 8080:8080 --env-file .env go-stripe-webhook-k8s
 
 Adjust image name, port, and env file path to match your setup. On **Apple Silicon**, use **`docker build --platform linux/arm64 ...`** if you want a native **arm64** image (the **`Dockerfile`** uses **`TARGETARCH`**).
 
-**CI:** **`.github/workflows/ci.yaml`** runs **`go build`**, **`go test`**, and **`make lint`** on pushes to **`main`**. Per **[PLAN.md — Milestone 3](PLAN.md#milestone-3-containerise)**, add a job that **builds and pushes** this image to your registry (secrets in GitHub, not in git). Multi-environment deploy stays optional stretch.
+**CI:** **`.github/workflows/ci.yaml`** on **`main`**: **`go build`**, **`go test`**, **`make lint`**, then **`docker buildx`** **build and push** to **ECR** via **OIDC** ( **Actions Variables** e.g. **`AWS_ROLE_ARN`** from Terraform output - see **[docs/branches/11-gh-actions-ecr-push.md](docs/branches/11-gh-actions-ecr-push.md)** ). No AWS access keys in git. Multi-environment deploy stays optional stretch.
 
 ## Kubernetes (Milestones 4–5)
 
