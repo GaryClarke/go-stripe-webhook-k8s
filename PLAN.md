@@ -146,6 +146,8 @@ Use a **single port convention** end-to-end (e.g. `8080`) to avoid confusion bet
 
 **Load balancing (two layers):** A **Service** gives **stable cluster-internal** DNS/IP and sends traffic to **Ready** Pods that match the **selector**; with **`replicas > 1`**, that behaves like **in-cluster** distribution across Pods. **Milestone 4** can stay at **`replicas: 1`**; raising replicas (e.g. to **3**) is a useful **optional stretch** to see multiple Pods behind one Service. **Edge** load balancing (clients → cloud load balancer → **Ingress** or **OpenShift Route** → **Service** → Pods) is **Milestone 5** / **Phase B**, not required for local **ClusterIP** + **`kubectl port-forward`**.
 
+**Milestone 4 status:** **`12-k8s-first-deploy`** adds **`k8s/deployment.yaml`** + **`k8s/service.yaml`**; **`kubectl`-created Secrets** (**`stripe-webhook-secret`**, **`ecr-registry`**) documented in **`docs/branches/12-k8s-first-deploy.md`** (never commit real **`whsec_*`** values). Treat **Done when** as satisfied on **`main`** once you can **`kubectl apply -f k8s/`**, see **`READY`**, **`kubectl port-forward svc/go-stripe-webhook-k8s 8080:8080`**, and **`curl`** **`/livez`** / **`/readyz`**.
+
 ---
 
 ## Milestone 5: OpenShift routing

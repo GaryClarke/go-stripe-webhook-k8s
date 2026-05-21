@@ -84,7 +84,7 @@ Details and ordering: [PLAN.md](PLAN.md).
 | `cmd/api` | HTTP service entrypoint for local and container runs. |
 | `internal/` | Shared packages (config, engine, dbg, etc.). |
 | `testdata/` | Stripe webhook fixtures. |
-| `k8s/` | Kubernetes manifests (as milestones progress). |
+| `k8s/` | **Milestone 4** manifests (**`deployment.yaml`**, **`service.yaml`**); cluster Secrets via **`kubectl`** (see **[docs/branches/12-k8s-first-deploy.md](docs/branches/12-k8s-first-deploy.md)**). |
 | `openshift/` | OpenShift `Route` and related objects (Milestone 5). |
 | `docs/` | Deeper design history from the Lambda era. |
 

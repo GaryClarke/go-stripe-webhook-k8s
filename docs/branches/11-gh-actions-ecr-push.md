@@ -27,5 +27,5 @@ Optional: **`AWS_REGION`**, **`ECR_REPOSITORY`** (defaults in the workflow match
 
 ## Follow-ups
 
-- **Milestone 4:** **`k8s/`** manifests using this image (registry URL from **`terraform output -raw ecr_repository_url`**).
+- **Milestone 4:** **`k8s/`** manifests — see **[12-k8s-first-deploy.md](12-k8s-first-deploy.md)** (**`12-k8s-first-deploy`**); registry URL from **`terraform output -raw ecr_repository_url`** (**`infra/terraform`**).
 - Optional: drop **`:latest`** in CI for immutable tags only; add **multi-arch** (**`arm64`**) if nodes need it.

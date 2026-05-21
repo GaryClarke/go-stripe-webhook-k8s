@@ -1,0 +1,58 @@
+# Deploys the Stripe webhook API as a long-running app on Kubernetes.
+# The Deployment keeps the desired number of Pod replicas (here: 1) and rolls out updates.
+# Private ECR: create pull Secret first — see docs/branches/12-k8s-first-deploy.md
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: go-stripe-webhook-k8s
+  labels:
+    app: go-stripe-webhook-k8s
+spec:
+  # How many identical Pods to run. 1 is enough for local learning; scale later if needed.
+  replicas: 1
+  selector:
+    # Must match spec.template.metadata.labels — links Deployment to its Pods.
+    matchLabels:
+      app: go-stripe-webhook-k8s
+  template:
+    metadata:
+      labels:
+        app: go-stripe-webhook-k8s
+    spec:
+      imagePullSecrets:
+        - name: ecr-registry
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: api
+          # Full image reference from ECR. Prefer a pinned SHA tag later (see PLAN.md Milestone 3).
+          image: 234290944523.dkr.ecr.eu-west-1.amazonaws.com/go-stripe-webhook-k8s:latest
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: STRIPE_WEBHOOK_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: stripe-webhook-secret
+                  key: STRIPE_WEBHOOK_SECRET
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            initialDelaySeconds: 2
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /livez
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 100m
+              memory: 64Mi
+            limits:
+              memory: 128Mi

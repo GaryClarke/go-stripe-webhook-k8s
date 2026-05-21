@@ -1,0 +1,16 @@
+# Stable in-cluster DNS + ClusterIP for the webhook Pods (selector matches Deployment labels).
+apiVersion: v1
+kind: Service
+metadata:
+  name: go-stripe-webhook-k8s
+  labels:
+    app: go-stripe-webhook-k8s
+spec:
+  type: ClusterIP
+  selector:
+    app: go-stripe-webhook-k8s
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+      protocol: TCP

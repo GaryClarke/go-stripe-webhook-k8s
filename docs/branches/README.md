@@ -26,6 +26,7 @@ Add a row when you open or complete a branch.
 | `9-containerise` | [09-containerise.md](09-containerise.md) | `Dockerfile` + `.dockerignore`, distroless non-root image; PLAN/README Milestone 3 |
 | `10-terraform-ecr-github-oidc` | [10-terraform-ecr-github-oidc.md](10-terraform-ecr-github-oidc.md) | `infra/terraform/`: ECR, GitHub OIDC + IAM role for CI ECR push; remote state; drop legacy `terraform/` |
 | `11-gh-actions-ecr-push` | [11-gh-actions-ecr-push.md](11-gh-actions-ecr-push.md) | CI: OIDC to AWS, buildx, push to ECR (`github.sha` + `latest`); Go jobs unchanged as gates |
+| `12-k8s-first-deploy` | [12-k8s-first-deploy.md](12-k8s-first-deploy.md) | `k8s/`: Deployment + ClusterIP Service, ECR pull + Stripe Secrets via `kubectl`, port-forward probes |
 
 **Doc template:** mirror the style in [original-branches](../original-branches/README.md): goal, scope, key files, how to verify, follow-ups.
 
