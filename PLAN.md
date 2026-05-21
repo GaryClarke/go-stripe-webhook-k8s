@@ -144,6 +144,8 @@ This **is** a real deployment: workloads run on a real kubelet; the only deliber
 
 Use a **single port convention** end-to-end (e.g. `8080`) to avoid confusion between Service `port`, `targetPort`, and the app `PORT`.
 
+**Load balancing (two layers):** A **Service** gives **stable cluster-internal** DNS/IP and sends traffic to **Ready** Pods that match the **selector**; with **`replicas > 1`**, that behaves like **in-cluster** distribution across Pods. **Milestone 4** can stay at **`replicas: 1`**; raising replicas (e.g. to **3**) is a useful **optional stretch** to see multiple Pods behind one Service. **Edge** load balancing (clients → cloud load balancer → **Ingress** or **OpenShift Route** → **Service** → Pods) is **Milestone 5** / **Phase B**, not required for local **ClusterIP** + **`kubectl port-forward`**.
+
 ---
 
 ## Milestone 5: OpenShift routing
