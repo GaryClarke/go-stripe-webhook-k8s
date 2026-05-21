@@ -51,6 +51,8 @@ Expect **`READY 1/1`** and **`{"status":"ok"}`** on both probes.
 
 ## Follow-ups
 
-- **PLAN Milestone 5:** **`openshift/route.yaml`** (or **Ingress**) vs **ClusterIP** only.
-- **`PLAN`** optional stretch: **`replicas: 3`** to see Service distribution; **immutable image tags** + deploy automation (**CI** patching image or **`kubectl set image`**).
+- **PLAN Milestone 5 (external access):**
+  - **OpenShift Route** (**`openshift/route.yaml`**) — align with Barclays / OpenShift-style edge exposure (**TLS**, **DNS** controlled by the platform).
+  - **Kubernetes Ingress** (generic counterpart) — same traffic story (`internet → controller → Ingress → Service → Pods`) on plain **Kubernetes**.
+- **`PLAN` optional stretch:** **`replicas: 3`** to see Service distribution; **immutable image tags** + deploy automation (**CI** patching image or **`kubectl set image`**).
 - Optional YAML: **`allowPrivilegeEscalation: false`**, **`readOnlyRootFilesystem`** when the distroless runtime allows.
