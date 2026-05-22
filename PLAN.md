@@ -200,6 +200,20 @@ You do not need a full cluster-distributed Kafka on day one; pick one local stor
 
 ---
 
+## Stretch (not numbered): OpenShift deploy job + secret automation
+
+**Why:** **Milestones 4–5** use **documented **`kubectl` / `oc`** commands** to create **pull** and **Stripe** **Secrets**. That is deliberate for learning. **Employer-style production** usually **automates** how **Secret** *values* arrive (no long-lived human **`oc create`** for every env). This stretch is **explicitly out of scope** for the numbered **M6–M8** ordering so **Observability → Idempotency → Kafka** stays intact.
+
+| | |
+|--|--|
+| **Learn** | **Pipeline deploy** (**`oc login`** / **`kubectl`** from **GitHub Actions**, **Tekton**, etc.) using **short-lived** CI credentials; **values** from **CI secret store** (**GitHub Secrets**, **Vault**) into cluster **Secrets** at deploy time. **Or** **operator-driven** sync (**External Secrets Operator**, **Secrets Store CSI**) from **AWS Secrets Manager**, **Azure Key Vault**, **HashiCorp Vault**, etc. **Or** **encrypted Git** (**Sealed Secrets**, **SOPS**). **ECR** pulls: **rotating** **`docker-registry`** **Secret** (**CronJob** / pipeline) or **platform-managed** pull (**cluster** pull secret, **mirror**, **ROSA**/cloud integration). |
+| **Build** | Pick **one** pattern and document it (**README** + **`docs/branches/`**): e.g. **GHA** job **`oc apply`** + **`oc create secret …`** from **`GH`** secrets (no values in logs), or **ExternalSecret** manifest in **git** pointing at a **store path** per environment. |
+| **Done when** | A **sandbox or non-prod** namespace can be **reprovisioned** without you **manually** pasting **`whsec_`** or **ECR passwords** on your laptop (one **pipeline** or **sync** run creates/updates **Secrets**). |
+
+**Does production “work” without this stretch?** Yes, for a **narrow** definition: **Sandbox** or a **small** env can run with **runbook** **`oc` steps** and **git** manifests. **Real** org **prod** almost always adds **automation** above for **rotation**, **audit**, and **least privilege** — that is what this stretch tracks.
+
+---
+
 ## Decisions
 
 Record short, dated bullets as you go (examples below).
@@ -212,10 +226,9 @@ Record short, dated bullets as you go (examples below).
 - **2026-05-08** - **Milestone 1** marked **complete** on **`main`**; **Milestone 2** **approved** shape: **`6-milestone-2-config`** or **`6-config-env`**, **`Load`**, fail-fast **`STRIPE_WEBHOOK_SECRET`**, **`PORT`** default **8080**, **`application` struct + config**, tests, then **Stripe** signature verification; **`DOWNSTREAM_URL`** **optional**/deferred until used. **Observability** (**Milestone 6**) before **idempotency** (**Milestone 7**); cluster **Secrets** / **`securityContext`** stay **Milestones 3–4** (no change).
 - **2026-05-08** - **`8-stripe-webhook-verify`**: **`stripe.ConstructEvent`** for **`POST /webhooks/stripe`**; **400** on missing / invalid **`Stripe-Signature`** or bad payload; tests use **`stripe.GenerateTestSignedPayload`**.
 - **2026-05-13** - **Milestone 3** includes **GitHub Actions** **build + push** of the container image to an **OCI registry** (cohesive with **`Dockerfile`** / **`.dockerignore`**); **multi-env deploy** stays **stretch** / later.
-- **2026-05-14** - **Milestone 3** completion split: **`10-terraform-ecr-github-oidc`** (**Terraform**: remove legacy **`terraform/`**, add **OIDC** + **IAM** CI role + **ECR** repo; own state **key**) then **`11-gh-actions-ecr-push`** (**GHA** **docker buildx** → **ECR** via **OIDC**). Registry choice: **AWS ECR** in the learning account for alignment with **EKS** / **Kubernetes on AWS** later (not **ECS** in **`PLAN`**).
-
----
+- **2026-05-21** - **Stretch** (not a new milestone number): document **OpenShift deploy job + secret automation** in **`PLAN`** so **M4–M5** stay **imperative **`oc`/`kubectl` secrets** for teaching, while **pipeline / operator / sealed** patterns are an explicit path toward **employer-style prod** without delaying **M6–M8**.
 
 ## Open questions
 
-- None yet; add items here when a milestone surfaces a choice (e.g. Redis vs SQL for idempotency, managed Kafka vs self-run).
+- **Secret / deploy automation:** after **Milestone 5** (Route + public URL), pick one **Stretch** approach (e.g. **GitHub Actions **`oc apply`** + secret sync from **`GH` Secrets**, or **External Secrets Operator** sketch) or defer if **Barclays** defines a standard pattern.
+- *Examples for later:* Redis vs SQL for idempotency (Milestone **7**); managed Kafka vs self-run (Milestone **8**).
