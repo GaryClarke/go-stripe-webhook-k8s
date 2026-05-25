@@ -67,7 +67,7 @@ Adjust image name, port, and env file path to match your setup. On **Apple Silic
 
 **Local first:** Run a real cluster on your machine (Docker Desktop Kubernetes, Minikube, or kind), then `kubectl apply -f k8s/`. That is a genuine deploy: same **Deployment** and **Service** pattern you will use elsewhere; you are only avoiding cloud IAM/VPC complexity until in-cluster concepts are familiar.
 
-- Apply manifests under `k8s/` (and OpenShift `Route` under `openshift/` when present).
+- Apply manifests under `k8s/`; on OpenShift, apply **`openshift/route.yaml`** after **Service**/Pods are healthy (see **[docs/branches/13-openshift-route.md](docs/branches/13-openshift-route.md)**).
 - Use `kubectl port-forward` to reach the Service from your machine until an Ingress or Route is configured.
 
 **Later (optional):** Target a **remote** cluster (**Phase B**, e.g. OpenShift Developer Sandbox) that **pulls** the image your CI publishes (**Milestone 3**). Same **Dockerfile** and manifests; add registry credentials and **kubeconfig** as needed. See [PLAN.md — Deployment phases](PLAN.md#deployment-phases).
@@ -85,7 +85,7 @@ Details and ordering: [PLAN.md](PLAN.md).
 | `internal/` | Shared packages (config, engine, dbg, etc.). |
 | `testdata/` | Stripe webhook fixtures. |
 | `k8s/` | **Milestone 4** manifests (**`deployment.yaml`**, **`service.yaml`**); cluster Secrets via **`kubectl`** (see **[docs/branches/12-k8s-first-deploy.md](docs/branches/12-k8s-first-deploy.md)**). |
-| `openshift/` | OpenShift `Route` and related objects (Milestone 5). |
+| `openshift/` | OpenShift **`Route`** and related manifests (Milestone 5); **Sandbox runbook**: **[docs/openshift/sandbox-runbook.md](docs/openshift/sandbox-runbook.md)**. |
 | `docs/` | Deeper design history from the Lambda era. |
 
 ## Contributing / learning flow

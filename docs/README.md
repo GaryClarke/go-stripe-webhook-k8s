@@ -18,6 +18,7 @@ Read this first when onboarding to the project or when you need to recall decisi
 As the project grows, this folder can also hold:
 
 - `branches/` - K8s track: per-branch learning logs ([index](branches/README.md))
+- `openshift/` - OpenShift Sandbox runbook ([index](openshift/README.md))
 - `original-branches/` - Historical Lambda track ([index](original-branches/README.md))
 - `decisions/` - ADRs or decision records
 - `runbooks/` - How to run locally, deploy, test

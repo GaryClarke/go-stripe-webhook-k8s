@@ -160,6 +160,8 @@ Use a **single port convention** end-to-end (e.g. `8080`) to avoid confusion bet
 
 For a **remote** OpenShift experience without standing up AWS yourself, the [Red Hat OpenShift Developer Sandbox](https://developers.redhat.com/developer-sandbox) (or your employer’s cluster) fits **Phase B**: build/push the image, apply manifests, add the Route.
 
+**Milestone 5 status:** **`13-openshift-route`** on **`main`** adds **`openshift/route.yaml`** (portable **`Route`**, **`tls.termination: edge`**, insecure redirect to **`https`**, **`targetPort: http`** to **`go-stripe-webhook-k8s`** Service) and **`docs/openshift/`**. **Done when** on **`Phase B`**: **`oc apply -f k8s/`**, **`oc apply -f openshift/route.yaml`**, public **`curl`** **`/livez`** / **`/readyz`** return **`cmd/api`** JSON, and you can narrate **Pods** → **ClusterIP Service** → **Route** (router terminates **TLS**). **Automated **`oc apply`** from CI + Secret lifecycle** stays the **Stretch** section below.
+
 ---
 
 ## Milestone 6: Observability
