@@ -4,6 +4,19 @@ Commands and flows for deploying **go-stripe-webhook-k8s** on **[OpenShift Devel
 
 **Related:** roadmap **[PLAN.md](../../PLAN.md)** Milestone **5** (routing); Stretch **deploy + secret automation** for pipeline / operator patterns later.
 
+## Session startup (typical workday)
+
+You usually **do not** run the whole runbook each day. Order of operations:
+
+1. **`oc login`** - only when **`oc`** fails with **provide credentials** / **not logged in** (Sandbox token expires; use **Copy login command** from the web console).
+2. **`oc project YOUR-PROJECT-dev`** - confirm you target the right namespace.
+3. **`curl -sS https://<route-host>/readyz`** - if you get **`{"status":"ok"}`**, the Route, Service, and Ready Pod are fine; stop here for health.
+4. **`ImagePullBackOff`** / **`ErrImagePull`** on the Pod - **ECR** password in **`ecr-registry`** expired (**~12h**). Refresh the **docker-registry** Secret (see **§2**), then **`oc delete pod -l app=go-stripe-webhook-k8s`** and wait for **`1/1 Running`**.
+5. **`Deployment` `READY` `0/0`** - scale back up (**`oc scale deployment go-stripe-webhook-k8s --replicas=1`**) or **`oc apply -f k8s/deployment.yaml`**.
+6. **`stripe-webhook-secret`** - update only when your Stripe **signing secret** changes, not on a daily clock.
+
+**Longer term:** automating **ECR** pull credential rotation and **deploy** from **CI** is the **Stretch** track in **PLAN.md**; until then, steps **1** and **4** are the repeating ones for Sandbox + private **ECR**.
+
 ---
 
 ## 1. CLI and login
