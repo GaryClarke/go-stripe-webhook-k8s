@@ -28,6 +28,7 @@ Add a row when you open or complete a branch.
 | `11-gh-actions-ecr-push` | [11-gh-actions-ecr-push.md](11-gh-actions-ecr-push.md) | CI: OIDC to AWS, buildx, push to ECR (`github.sha` + `latest`); Go jobs unchanged as gates |
 | `12-k8s-first-deploy` | [12-k8s-first-deploy.md](12-k8s-first-deploy.md) | `k8s/`: Deployment + ClusterIP Service, ECR pull + Stripe Secrets via `kubectl`, port-forward probes |
 | `13-openshift-route` | [13-openshift-route.md](13-openshift-route.md) | **`openshift/route.yaml`** (portable **Route**, TLS edge); Sandbox runbook **`docs/openshift/`** |
+| `14-structured-logging` | [14-structured-logging.md](14-structured-logging.md) | **Milestone 6** (in progress): Phase 0 learn, JSON **`slog`**, request middleware, **Recover** alignment |
 
 **Doc template:** mirror the style in [original-branches](../original-branches/README.md): goal, scope, key files, how to verify, follow-ups.
 

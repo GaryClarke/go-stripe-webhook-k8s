@@ -2,15 +2,17 @@ package main
 
 import (
 	"integration-engine/internal/config"
+	"log/slog"
 	"net/http"
 )
 
 type App struct {
-	cfg *config.Config
+	cfg    *config.Config
+	logger *slog.Logger
 }
 
-func NewApp(cfg *config.Config) *App {
-	return &App{cfg}
+func NewApp(cfg *config.Config, logger *slog.Logger) *App {
+	return &App{cfg: cfg, logger: logger}
 }
 
 // routes registers all HTTP handlers on a ServeMux. Tests and production use the same wiring.

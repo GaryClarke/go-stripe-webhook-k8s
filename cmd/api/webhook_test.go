@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -16,10 +17,14 @@ const testWebhookSecret = "whsec_test"
 
 // apiHandler matches main: panic recovery wraps the mux (same stack as production).
 func apiHandler() http.Handler {
+	var buf bytes.Buffer
+	logger := NewJSONLogger(&buf, nil)
 	app := NewApp(&config.Config{
 		StripeWebhookSecret: testWebhookSecret,
 		Port:                "8080",
-	})
+	},
+		logger,
+	)
 	return Recover(app.routes())
 }
 

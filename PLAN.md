@@ -168,13 +168,26 @@ For a **remote** OpenShift experience without standing up AWS yourself, the [Red
 
 | | |
 |--|--|
-| **Learn** | Structured logs; request or correlation IDs; operational log lines without secrets. |
-| **Build** | Consistent JSON (or agreed format); log receipt, Stripe event id, outcome, errors. |
-| **Done when** | `kubectl logs` is enough to trace a single webhook through the service. |
+| **Learn** | Structured logs; request or correlation IDs; operational log lines without secrets; **HTTP middleware** for request-scoped logging (stdout → later Datadog/ELK/CloudWatch via the platform). |
+| **Build** | Consistent JSON (or agreed format) to **stdout**; **response-wrapping** middleware (request ID, request start/end or equivalent); log Stripe **event id**, **type**, outcome, and errors (no secrets or raw card data). Revisit **`Recover`** in **`cmd/api/recover.go`** with that middleware so panics after the response has started do not fight **`http.Error`** (track response-started, or log-only on panic). Optional **`docs/branches/`** note: example **`oc logs`** / **`grep`** today and example field searches for a future central system. |
+| **Done when** | `kubectl logs` / `oc logs` is enough to trace a single webhook through the service (answer: what happened to this event?). |
 
 **Ordering:** This milestone sits **before idempotency** (Milestone 7) so logs help debug duplicate delivery and storage behaviour.
 
-**Recover / partial response (deferred from Milestone 1):** If a handler **panics after** it has already started the response (e.g. **`WriteHeader`** or body bytes on the wire), **`http.Error`** in **`Recover`** cannot reliably turn the client-visible outcome into **500** - see the comment on **`Recover`** in **`cmd/api/recover.go`**. When you add **response-wrapping** middleware here (logging, correlation IDs, body capture), revisit **`Recover`**: e.g. track whether the response has started and **log only** after that point, or use patterns built around **`http.ResponseWriter`** / **`http.ResponseController`** so panic handling does not double-write or corrupt the stream.
+**Out of scope for M6:** Installing Datadog, ELK, CloudWatch, or cluster logging stacks; metrics, tracing, dashboards, alerting.
+
+**Recover / partial response (deferred from Milestone 1, in scope for M6):** If a handler **panics after** it has already started the response (e.g. **`WriteHeader`** or body bytes on the wire), **`http.Error`** in **`Recover`** cannot reliably turn the client-visible outcome into **500** - see **`cmd/api/recover.go`**. **M6** includes aligning **middleware + `Recover`** (e.g. wrapped **`http.ResponseWriter`**, **`http.ResponseController`**, or log-only after write started) so panic handling does not double-write or corrupt the stream.
+
+**Milestone 6 status:** In progress on **`14-structured-logging`**. Branch doc: **[docs/branches/14-structured-logging.md](docs/branches/14-structured-logging.md)** (Phase 0 learn, log contract, phased build). **Not done** until **`oc logs`** / **`kubectl logs`** trace one webhook end-to-end with structured fields.
+
+**Implementation order (summary):**
+
+1. **Phase 0** - Learn: stdout pipeline, read **`main`**, **`recover.go`**, **`handlers.go`**; lock request ID + JSON field contract (see branch doc).
+2. **Phase 1** - **`log/slog`** JSON to stdout.
+3. **Phase 2** - Response-wrapping + request middleware; **`Recover(RequestLog(routes))`** in **`main`**.
+4. **Phase 3** - Stripe handler structured **`msg`** lines; no secrets in logs.
+5. **Phase 4** - **Recover** vs response-started; tests match production stack.
+6. **Phase 5** - Verify **`go test`**, local run, **`oc logs`**; document example **`grep`** / future ELK/Datadog-style queries in branch doc.
 
 ---
 
@@ -229,6 +242,11 @@ Record short, dated bullets as you go (examples below).
 - **2026-05-08** - **`8-stripe-webhook-verify`**: **`stripe.ConstructEvent`** for **`POST /webhooks/stripe`**; **400** on missing / invalid **`Stripe-Signature`** or bad payload; tests use **`stripe.GenerateTestSignedPayload`**.
 - **2026-05-13** - **Milestone 3** includes **GitHub Actions** **build + push** of the container image to an **OCI registry** (cohesive with **`Dockerfile`** / **`.dockerignore`**); **multi-env deploy** stays **stretch** / later.
 - **2026-05-21** - **Stretch** (not a new milestone number): document **OpenShift deploy job + secret automation** in **`PLAN`** so **M4–M5** stay **imperative **`oc`/`kubectl` secrets** for teaching, while **pipeline / operator / sealed** patterns are an explicit path toward **employer-style prod** without delaying **M6–M8**.
+- **2026-05-27** - **Milestone 6 request ID:** honor inbound **`X-Request-Id`** when present and valid, else generate **UUID v4**; store on **`context`**; log **`request_id`** on every structured line. **`event_id`** (Stripe) stays separate for webhook tracing and later idempotency.
+- **2026-05-27** - **Milestone 6 logging:** **`log/slog`** with **`JSONHandler`** to **stdout**; migrate **`cmd/api`** off **`log`** / **`log.Printf`**. **`App`** holds base **`*slog.Logger`**; request middleware attaches a request-scoped logger (with **`request_id`**) on **`context`** for handlers.
+- **2026-05-27** - **Milestone 6 access logs:** **`RequestLog`** middleware skips **`request_started`** / **`request_completed`** for **`GET /livez`** and **`GET /readyz`** (probe noise); all other routes logged at **info**. Handlers may still use minimal probe logs only if needed (default: none).
+- **2026-05-27** - **Milestone 6 Stripe tracing:** **`request_id`** on every HTTP log line (middleware + handlers). After successful **`ConstructEvent`**, add **`event_id`** and **`event_type`** on all webhook handler logs for that request; on verify/read failures, log **`request_id`** only (no **`event_id`** until parsed). **`event_id`** is the stable key across retries and future milestones (idempotency, Kafka); **`request_id`** is one delivery attempt.
+- **2026-05-27** - **Milestone 6 handler stack:** **`Recover(RequestLog(app.routes()))`** in **`main`** - **Recover** outermost (catches panics in logging middleware and handlers); **`RequestLog`** wraps routes and the response-recording **`ResponseWriter`**.
 
 ## Open questions
 

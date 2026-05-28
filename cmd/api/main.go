@@ -18,7 +18,8 @@ func main() {
 	if err != nil {
 		log.Fatalf("config: %v", err)
 	}
-	app := NewApp(cfg)
+	logger := NewJSONLogger(os.Stdout, nil)
+	app := NewApp(cfg, logger)
 
 	addr := ":" + cfg.Port
 	handler := Recover(app.routes())
