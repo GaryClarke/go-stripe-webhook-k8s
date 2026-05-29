@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"errors"
-	"log"
 	"net/http"
 	"os"
 	"os/signal"
@@ -14,11 +13,12 @@ import (
 )
 
 func main() {
+	logger := NewJSONLogger(os.Stdout, nil)
 	cfg, err := config.Load()
 	if err != nil {
-		log.Fatalf("config: %v", err)
+		logger.Error("config_load_failed", "error", err.Error())
+		os.Exit(1)
 	}
-	logger := NewJSONLogger(os.Stdout, nil)
 	app := NewApp(cfg, logger)
 
 	addr := ":" + cfg.Port
@@ -36,12 +36,16 @@ func main() {
 	// in main alone, we would never reach the signal handler or Shutdown below.
 	// Running it in a goroutine lets main wait on OS signals while the server runs.
 	go func() {
-		log.Printf("listening on %s", srv.Addr)
+		logger.Info("server_listening", "addr", srv.Addr)
 		err := srv.ListenAndServe()
 		// After Shutdown(), ListenAndServe returns http.ErrServerClosed. That is
 		// expected. Any other error (e.g. address already in use) is fatal.
 		if err != nil && !errors.Is(err, http.ErrServerClosed) {
-			log.Fatalf("listen: %v", err)
+			logger.Error("server_listen_error",
+				"error", err.Error(),
+				"addr", srv.Addr,
+			)
+			os.Exit(1)
 		}
 	}()
 
@@ -56,11 +60,10 @@ func main() {
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 
 	// Block until one registered signal is delivered. We do not assign the value:
-	// we only need "something arrived". You could use sig := <-quit if you want to
+	// we only need "something arrived". Uses sig := <-quit to
 	// log which signal (SIGINT vs SIGTERM). For several channels at once, use select.
-	<-quit
-
-	log.Printf("shutting down...")
+	sig := <-quit
+	logger.Info("shutting_down", "signal", sig.String())
 
 	// Shutdown stops accepting new connections and waits for in-flight requests to
 	// finish, or until ctx times out. Align this timeout with pod terminationGracePeriodSeconds.
@@ -71,6 +74,8 @@ func main() {
 	// We log rather than Fatalf so shutdown can complete; tune timeout or use a
 	// non-zero exit in production if your platform cares.
 	if err := srv.Shutdown(ctx); err != nil {
-		log.Printf("shutdown: %v", err)
+		logger.Error("server_shutdown_error",
+			"error", err.Error(),
+		)
 	}
 }
