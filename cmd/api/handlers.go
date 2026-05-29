@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
-	"log"
 	"net/http"
 
 	"github.com/stripe/stripe-go/v85"
@@ -19,7 +18,10 @@ func (app *App) handleLivez(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	resp := healthResponse{Status: "ok"}
 	if err := json.NewEncoder(w).Encode(resp); err != nil {
-		log.Printf("livez: encode response: %v", err)
+		app.logger.Error("probe_encode_error",
+			"probe", "livez",
+			"error", err.Error(),
+		)
 	}
 }
 
@@ -27,7 +29,10 @@ func (app *App) handleReadyz(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	resp := healthResponse{Status: "ok"}
 	if err := json.NewEncoder(w).Encode(resp); err != nil {
-		log.Printf("readyz: encode response: %v", err)
+		app.logger.Error("probe_encode_error",
+			"probe", "readyz",
+			"error", err.Error(),
+		)
 	}
 }
 
@@ -39,11 +44,16 @@ func (app *App) handleStripeWebhook(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		var maxErr *http.MaxBytesError
 		if errors.As(err, &maxErr) {
-			log.Printf("webhooks/stripe: body over max (%d bytes)", maxStripeWebhookBody)
+			app.logger.Error("stripe_body_too_large",
+				"max_bytes", maxStripeWebhookBody,
+			)
 			http.Error(w, http.StatusText(http.StatusRequestEntityTooLarge), http.StatusRequestEntityTooLarge)
 			return
 		}
-		log.Printf("webhooks/stripe: read body: %v", err)
+		app.logger.Error("stripe_event_verify_failed",
+			"reason", "read_body",
+			"error", err.Error(),
+		)
 		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 		return
 	}
@@ -52,13 +62,20 @@ func (app *App) handleStripeWebhook(w http.ResponseWriter, r *http.Request) {
 	ev, err := stripe.ConstructEvent(body, sigHeader, app.cfg.StripeWebhookSecret)
 	if err != nil {
 		// Stripe's webhook examples use 400 for invalid payload / signature verification failures.
-		log.Printf("webhooks/stripe: %v", err)
+		app.logger.Error("stripe_event_verify_failed",
+			"reason", "verify_event",
+			"error", err.Error(),
+		)
 		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 		return
 	}
 
-	log.Printf("webhooks/stripe: event_id=%q type=%q body_bytes=%d remote_addr=%s",
-		ev.ID, ev.Type, len(body), r.RemoteAddr)
+	app.logger.Info("stripe_event_accepted",
+		"event_id", ev.ID,
+		"event_type", string(ev.Type),
+		"body_bytes", len(body),
+		"remote_addr", r.RemoteAddr,
+	)
 
 	w.WriteHeader(http.StatusNoContent)
 }
