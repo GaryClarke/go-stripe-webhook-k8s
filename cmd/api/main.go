@@ -22,7 +22,7 @@ func main() {
 	app := NewApp(cfg, logger)
 
 	addr := ":" + cfg.Port
-	handler := Recover(app.routes())
+	handler := Recover(logger, app.routes())
 
 	// http.Server is the long-lived server value. Using it (instead of
 	// http.ListenAndServe alone) gives us Shutdown(), which Kubernetes expects

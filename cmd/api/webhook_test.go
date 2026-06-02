@@ -25,7 +25,7 @@ func apiHandler() http.Handler {
 	},
 		logger,
 	)
-	return Recover(app.routes())
+	return Recover(logger, app.routes())
 }
 
 // validStripeWebhookJSON is JSON ConstructEvent accepts for testWebhookSecret when paired with a valid Stripe-Signature.

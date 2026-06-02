@@ -1,6 +1,7 @@
 package main
 
 import (
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -15,7 +16,8 @@ func TestRecover_PanicReturns500(t *testing.T) {
 		panic("intentional test panic")
 	})
 
-	handler := Recover(mux)
+	logger := NewJSONLogger(io.Discard, nil)
+	handler := Recover(logger, mux)
 	req := httptest.NewRequest(http.MethodGet, "/boom", nil)
 	rec := httptest.NewRecorder()
 
@@ -38,7 +40,8 @@ func TestRecover_NoPanicPassesThrough(t *testing.T) {
 		w.WriteHeader(http.StatusNoContent)
 	})
 
-	handler := Recover(mux)
+	logger := NewJSONLogger(io.Discard, nil)
+	handler := Recover(logger, mux)
 	req := httptest.NewRequest(http.MethodGet, "/ok", nil)
 	rec := httptest.NewRecorder()
 
