@@ -26,10 +26,11 @@ cmd/api writes JSON lines to stdout/stderr
 
 | File | Why |
 |------|-----|
-| **`cmd/api/main.go`** | Today: **`Recover(app.routes())`** - plan **`Recover(RequestLog(app.routes()))`**. |
-| **`cmd/api/recover.go`** | Panic after **`WriteHeader`** / body bytes - **`http.Error`** may be wrong; M6 must detect **response started**. |
-| **`cmd/api/handlers.go`** | Current **`log.Printf`** on webhook path - will move to structured fields. |
-| **`cmd/api/webhook_test.go`** | **`apiHandler()`** must match **production middleware stack** after M6. |
+| **`cmd/api/main.go`** | Today: **`Recover(logger, app.routes())`** - Phase 2: **`Recover(logger, RequestLog(logger, app.routes()))`**. |
+| **`cmd/api/recover.go`** | Panics log as structured **`panic`** via **`slog`**. Phase 4: **`response_started`** + skip **`http.Error`** when headers/body already sent. |
+| **`cmd/api/handlers.go`** | Webhook/probe paths use **`app.logger`** and stable **`msg`** values; Phase 2/3 add **`request_id`** from context on every line. |
+| **`cmd/api/logger.go`** | **`NewJSONLogger`** - JSON **`slog`** handler to stdout (or test buffer). |
+| **`cmd/api/webhook_test.go`** | **`apiHandler()`** must match **production middleware stack** (today: same **`Recover`** + routes as **`main`**). |
 
 ### 0.3 HTTP middleware (request-scoped logging)
 
@@ -79,12 +80,12 @@ Common envelope: `time`, `level`, `msg`, plus handler-specific keys. **No** secr
 
 | Phase | Scope | Status |
 |-------|--------|--------|
-| **0** | Learn (this doc) | In progress |
-| **1** | **`slog`** JSON foundation; **`App.logger`**; context helper; replace **`log`** in **`main`**, **`handlers`**, **`recover`** | Not started |
-| **2** | Response wrapper + **RequestLog** middleware; wire **`main`** | Not started |
-| **3** | **`handleStripeWebhook`** structured events; quiet probes | Not started |
-| **4** | **Recover** + tests (**`apiHandler`** stack) | Not started |
-| **5** | Verify local + **`oc logs`**; example searches below | Not started |
+| **0** | Learn (this doc) | **Done** — decisions locked (**PLAN** **2026-05-27**). |
+| **1** | **`slog`** JSON foundation (**`cmd/api/logger.go`**); **`App.logger`**; replace **`log`** in **`main`**, **`handlers`**, **`recover`** | **Done** — commits through **`1057e1e`**. Context helper + per-request logger on **`context`** deferred to **Phase 2**. |
+| **2** | Response wrapper + **RequestLog** middleware; request ID; wire **`Recover(logger, RequestLog(logger, app.routes()))`** in **`main`** and **`apiHandler()`** | **Next** |
+| **3** | **`handleStripeWebhook`** — **`request_id`** on all webhook lines; **`event_id`** / **`event_type`** only after verify (msgs exist; correlation IDs pending Phase 2) | **Partial** |
+| **4** | **Recover** vs response-started (**`response_started`**, no double-write); **`apiHandler`** stack matches **`main`** | **Partial** — **`slog`** panic logging done; response-started handling not yet. |
+| **5** | Verify local + **`oc logs`**; example searches below; **PLAN** M6 done when traceable | **Not started** |
 
 ---
 
@@ -128,8 +129,8 @@ Adapt syntax to ELK/KQL, Datadog, or CloudWatch Logs Insights when your platform
 
 ## Files expected to change (Phases 1-5)
 
-- **`cmd/api/app.go`** (**`*slog.Logger`** on **`App`**), **`cmd/api/main.go`**, **`cmd/api/handlers.go`**, **`cmd/api/recover.go`**
-- New: **`cmd/api/middleware.go`** and/or **`cmd/api/logging.go`** (context key + **`loggerFromContext`**; names TBD)
+- **Phase 1 (done):** **`cmd/api/logger.go`**, **`cmd/api/logger_test.go`**, **`cmd/api/app.go`**, **`cmd/api/main.go`**, **`cmd/api/handlers.go`**, **`cmd/api/recover.go`**, **`cmd/api/recover_test.go`**, **`cmd/api/webhook_test.go`**
+- **Phase 2+:** New **`cmd/api/middleware.go`** and/or **`cmd/api/logging.go`** (context key + request-scoped logger; names TBD)
 - **`cmd/api/webhook_test.go`** (and new middleware tests)
 - **`PLAN.md`** Milestone 6 status; **Decisions** bullets
 - This file (status table + locked decisions)
