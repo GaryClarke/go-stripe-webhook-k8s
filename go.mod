@@ -8,3 +8,5 @@ require (
 )
 
 require github.com/stripe/stripe-go/v85 v85.1.0
+
+require github.com/google/uuid v1.6.0 // indirect
