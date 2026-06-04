@@ -19,7 +19,7 @@ func Recover(logger *slog.Logger, next http.Handler) http.Handler {
 		defer func() {
 			if err := recover(); err != nil {
 				// Log for operators; never send panic text or stack to clients in prod.
-				logger.Error("panic",
+				logger.Error(msgPanic,
 					"error", fmt.Sprint(err),
 					"stack", string(debug.Stack()),
 					"path", r.URL.Path,

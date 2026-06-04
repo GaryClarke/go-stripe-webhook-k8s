@@ -16,13 +16,13 @@ func main() {
 	logger := NewJSONLogger(os.Stdout, nil)
 	cfg, err := config.Load()
 	if err != nil {
-		logger.Error("config_load_failed", "error", err.Error())
+		logger.Error(msgConfigLoadFailed, "error", err.Error())
 		os.Exit(1)
 	}
 	app := NewApp(cfg, logger)
 
 	addr := ":" + cfg.Port
-	handler := Recover(logger, app.routes())
+	handler := Recover(logger, RequestLog(logger, app.routes()))
 
 	// http.Server is the long-lived server value. Using it (instead of
 	// http.ListenAndServe alone) gives us Shutdown(), which Kubernetes expects
@@ -36,12 +36,12 @@ func main() {
 	// in main alone, we would never reach the signal handler or Shutdown below.
 	// Running it in a goroutine lets main wait on OS signals while the server runs.
 	go func() {
-		logger.Info("server_listening", "addr", srv.Addr)
+		logger.Info(msgServerListening, "addr", srv.Addr)
 		err := srv.ListenAndServe()
 		// After Shutdown(), ListenAndServe returns http.ErrServerClosed. That is
 		// expected. Any other error (e.g. address already in use) is fatal.
 		if err != nil && !errors.Is(err, http.ErrServerClosed) {
-			logger.Error("server_listen_error",
+			logger.Error(msgServerListenError,
 				"error", err.Error(),
 				"addr", srv.Addr,
 			)
@@ -63,7 +63,7 @@ func main() {
 	// we only need "something arrived". Uses sig := <-quit to
 	// log which signal (SIGINT vs SIGTERM). For several channels at once, use select.
 	sig := <-quit
-	logger.Info("shutting_down", "signal", sig.String())
+	logger.Info(msgShuttingDown, "signal", sig.String())
 
 	// Shutdown stops accepting new connections and waits for in-flight requests to
 	// finish, or until ctx times out. Align this timeout with pod terminationGracePeriodSeconds.
@@ -74,7 +74,7 @@ func main() {
 	// We log rather than Fatalf so shutdown can complete; tune timeout or use a
 	// non-zero exit in production if your platform cares.
 	if err := srv.Shutdown(ctx); err != nil {
-		logger.Error("server_shutdown_error",
+		logger.Error(msgServerShutdownError,
 			"error", err.Error(),
 		)
 	}

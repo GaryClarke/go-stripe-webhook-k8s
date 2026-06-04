@@ -15,7 +15,7 @@ import (
 
 const testWebhookSecret = "whsec_test"
 
-// apiHandler matches main: panic recovery wraps the mux (same stack as production).
+// apiHandler matches main: Recover(RequestLog(routes)).
 func apiHandler() http.Handler {
 	var buf bytes.Buffer
 	logger := NewJSONLogger(&buf, nil)
@@ -25,7 +25,7 @@ func apiHandler() http.Handler {
 	},
 		logger,
 	)
-	return Recover(logger, app.routes())
+	return Recover(logger, RequestLog(logger, app.routes()))
 }
 
 // validStripeWebhookJSON is JSON ConstructEvent accepts for testWebhookSecret when paired with a valid Stripe-Signature.

@@ -18,7 +18,7 @@ func (app *App) handleLivez(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	resp := healthResponse{Status: "ok"}
 	if err := json.NewEncoder(w).Encode(resp); err != nil {
-		app.logger.Error("probe_encode_error",
+		app.logger.Error(msgProbeEncodeError,
 			"probe", "livez",
 			"error", err.Error(),
 		)
@@ -29,7 +29,7 @@ func (app *App) handleReadyz(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	resp := healthResponse{Status: "ok"}
 	if err := json.NewEncoder(w).Encode(resp); err != nil {
-		app.logger.Error("probe_encode_error",
+		app.logger.Error(msgProbeEncodeError,
 			"probe", "readyz",
 			"error", err.Error(),
 		)
@@ -44,13 +44,13 @@ func (app *App) handleStripeWebhook(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		var maxErr *http.MaxBytesError
 		if errors.As(err, &maxErr) {
-			app.logger.Error("stripe_body_too_large",
+			app.logger.Error(msgStripeBodyTooLarge,
 				"max_bytes", maxStripeWebhookBody,
 			)
 			http.Error(w, http.StatusText(http.StatusRequestEntityTooLarge), http.StatusRequestEntityTooLarge)
 			return
 		}
-		app.logger.Error("stripe_event_verify_failed",
+		app.logger.Error(msgStripeEventVerifyFailed,
 			"reason", "read_body",
 			"error", err.Error(),
 		)
@@ -62,7 +62,7 @@ func (app *App) handleStripeWebhook(w http.ResponseWriter, r *http.Request) {
 	ev, err := stripe.ConstructEvent(body, sigHeader, app.cfg.StripeWebhookSecret)
 	if err != nil {
 		// Stripe's webhook examples use 400 for invalid payload / signature verification failures.
-		app.logger.Error("stripe_event_verify_failed",
+		app.logger.Error(msgStripeEventVerifyFailed,
 			"reason", "verify_event",
 			"error", err.Error(),
 		)
@@ -70,7 +70,7 @@ func (app *App) handleStripeWebhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	app.logger.Info("stripe_event_accepted",
+	app.logger.Info(msgStripeEventAccepted,
 		"event_id", ev.ID,
 		"event_type", string(ev.Type),
 		"body_bytes", len(body),
