@@ -4,6 +4,8 @@
 
 **Git branch:** `14-structured-logging`
 
+**Status:** **Complete** (merged to **`main`**). Local Phase 5 verified (`go test`, unsigned curl, **`stripe listen --latest`** + **204**). **Sandbox:** after CI pushes ECR **`latest`**, **`oc rollout restart`** then **`oc logs`** for JSON + **`request_id`** (see **How to verify**). **Phase 4** (**Recover** + **`response_started`**) deferred to a follow-up branch.
+
 ---
 
 ## Phase 0 - Learn (before code)
@@ -26,11 +28,14 @@ cmd/api writes JSON lines to stdout/stderr
 
 | File | Why |
 |------|-----|
-| **`cmd/api/main.go`** | Today: **`Recover(logger, app.routes())`** - Phase 2: **`Recover(logger, RequestLog(logger, app.routes()))`**. |
-| **`cmd/api/recover.go`** | Panics log as structured **`panic`** via **`slog`**. Phase 4: **`response_started`** + skip **`http.Error`** when headers/body already sent. |
-| **`cmd/api/handlers.go`** | Webhook/probe paths use **`app.logger`** and stable **`msg`** values; Phase 2/3 add **`request_id`** from context on every line. |
+| **`cmd/api/main.go`** | **`Recover(logger, RequestLog(logger, app.routes()))`**. |
+| **`cmd/api/requestlog.go`** | **`RequestLog`**, **`responseRecorder`**, **`isProbeRequest`**. |
+| **`cmd/api/logging.go`** | **`resolveRequestID`**, context logger (**`loggerFromContext`**). |
+| **`cmd/api/logmsg.go`** | Stable **`msg`** contract constants. |
+| **`cmd/api/recover.go`** | Structured **`panic`** via **`slog`**. Follow-up: **`response_started`**, skip **`http.Error`** when response already sent. |
+| **`cmd/api/handlers.go`** | **`loggerFromContext`**; **`event_id`** / **`event_type`** after verify. |
 | **`cmd/api/logger.go`** | **`NewJSONLogger`** - JSON **`slog`** handler to stdout (or test buffer). |
-| **`cmd/api/webhook_test.go`** | **`apiHandler()`** must match **production middleware stack** (today: same **`Recover`** + routes as **`main`**). |
+| **`cmd/api/webhook_test.go`** | **`apiHandler()`** matches **`main`** middleware stack. |
 
 ### 0.3 HTTP middleware (request-scoped logging)
 
@@ -80,23 +85,31 @@ Common envelope: `time`, `level`, `msg`, plus handler-specific keys. **No** secr
 
 | Phase | Scope | Status |
 |-------|--------|--------|
-| **0** | Learn (this doc) | **Done** — decisions locked (**PLAN** **2026-05-27**). |
-| **1** | **`slog`** JSON foundation (**`cmd/api/logger.go`**); **`App.logger`**; replace **`log`** in **`main`**, **`handlers`**, **`recover`** | **Done** — commits through **`1057e1e`**. Context helper + per-request logger on **`context`** deferred to **Phase 2**. |
-| **2** | Response wrapper + **RequestLog** middleware; request ID; wire **`Recover(logger, RequestLog(logger, app.routes()))`** in **`main`** and **`apiHandler()`** | **Next** |
-| **3** | **`handleStripeWebhook`** — **`request_id`** on all webhook lines; **`event_id`** / **`event_type`** only after verify (msgs exist; correlation IDs pending Phase 2) | **Partial** |
-| **4** | **Recover** vs response-started (**`response_started`**, no double-write); **`apiHandler`** stack matches **`main`** | **Partial** — **`slog`** panic logging done; response-started handling not yet. |
-| **5** | Verify local + **`oc logs`**; example searches below; **PLAN** M6 done when traceable | **Not started** |
+| **0** | Learn (this doc) | **Done** |
+| **1** | **`slog`** JSON foundation; **`App.logger`**; migrate **`log`** in **`main`**, **`handlers`**, **`recover`** | **Done** |
+| **2** | **RequestLog**, request ID, **`Recover(logger, RequestLog(logger, app.routes()))`** | **Done** |
+| **3** | Handlers use **`loggerFromContext`**; **`event_id`** / **`event_type`** after verify | **Done** |
+| **4** | **Recover** + **`response_started`** (no double-write on panic) | **Deferred** — follow-up branch |
+| **5** | Verify **`go test`**, local run, **`oc logs`** | **Done** locally; **Sandbox** after merge + CI ECR push + **`oc rollout restart`** |
 
 ---
 
-## How to verify (after Phase 5)
+## How to verify
 
 ```bash
 go test ./...
 go run ./cmd/api   # .env with STRIPE_WEBHOOK_SECRET
 ```
 
-Stripe test event (Sandbox or CLI), then:
+**Local signed webhook:** **`stripe listen --latest --forward-to http://127.0.0.1:8080/webhooks/stripe`** (test accounts may need **`--latest`** for API version); put listen **`whsec_...`** in **`.env`**, restart **`go run`**, then **`stripe trigger …`**. Expect **204** and JSON lines with shared **`request_id`**.
+
+**Sandbox** (after **`main`** CI pushes image):
+
+```bash
+oc rollout restart deployment/go-stripe-webhook-k8s
+```
+
+Stripe test event (Dashboard destination on Route URL), then:
 
 ```bash
 oc logs deployment/go-stripe-webhook-k8s --tail=50
@@ -127,15 +140,15 @@ Adapt syntax to ELK/KQL, Datadog, or CloudWatch Logs Insights when your platform
 
 ---
 
-## Files expected to change (Phases 1-5)
+## Key files (shipped)
 
-- **Phase 1 (done):** **`cmd/api/logger.go`**, **`cmd/api/logger_test.go`**, **`cmd/api/app.go`**, **`cmd/api/main.go`**, **`cmd/api/handlers.go`**, **`cmd/api/recover.go`**, **`cmd/api/recover_test.go`**, **`cmd/api/webhook_test.go`**
-- **Phase 2+:** New **`cmd/api/middleware.go`** and/or **`cmd/api/logging.go`** (context key + request-scoped logger; names TBD)
-- **`cmd/api/webhook_test.go`** (and new middleware tests)
-- **`PLAN.md`** Milestone 6 status; **Decisions** bullets
-- This file (status table + locked decisions)
+- **`cmd/api/logger.go`**, **`cmd/api/logmsg.go`**, **`cmd/api/logging.go`**, **`cmd/api/requestlog.go`**
+- **`cmd/api/app.go`**, **`cmd/api/main.go`**, **`cmd/api/handlers.go`**, **`cmd/api/recover.go`**
+- Tests: **`logger_test.go`**, **`logging_test.go`**, **`requestlog_test.go`**, **`recover_test.go`**, **`webhook_test.go`**
 
 ## Follow-ups
 
+- **Phase 4:** **Recover** + **`response_started`** when panic after **`WriteHeader`** / body bytes (optional branch).
+- **`event_id`** on **`request_completed`** (PLAN optional; handler line has **`event_id`** today).
 - **Milestone 7:** Idempotency - logs should show duplicate **`event_id`** attempts.
 - **Stretch:** CI deploy + secret automation (**PLAN** Stretch section).

@@ -178,7 +178,7 @@ For a **remote** OpenShift experience without standing up AWS yourself, the [Red
 
 **Recover / partial response (deferred from Milestone 1, in scope for M6):** If a handler **panics after** it has already started the response (e.g. **`WriteHeader`** or body bytes on the wire), **`http.Error`** in **`Recover`** cannot reliably turn the client-visible outcome into **500** - see **`cmd/api/recover.go`**. **M6** includes aligning **middleware + `Recover`** (e.g. wrapped **`http.ResponseWriter`**, **`http.ResponseController`**, or log-only after write started) so panic handling does not double-write or corrupt the stream.
 
-**Milestone 6 status:** In progress on **`14-structured-logging`**. Branch doc: **[docs/branches/14-structured-logging.md](docs/branches/14-structured-logging.md)** (Phase 0 learn, log contract, phased build). **Not done** until **`oc logs`** / **`kubectl logs`** trace one webhook end-to-end with structured fields.
+**Milestone 6 status:** **Complete** on **`main`** via **`14-structured-logging`**. Branch doc: **[docs/branches/14-structured-logging.md](docs/branches/14-structured-logging.md)**. Shipped: JSON **`slog`**, **`RequestLog`**, **`request_id`** on context, **`logmsg`** contract, handler correlation. **Phase 4** (**Recover** + **`response_started`** on panic after write started) deferred to a follow-up branch. **Sandbox:** after CI pushes ECR **`latest`**, **`oc rollout restart`** and confirm **`oc logs`** JSON trace (local verify done). **Next:** **Milestone 7** (idempotency).
 
 **Implementation order (summary):**
 
