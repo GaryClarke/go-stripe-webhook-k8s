@@ -196,8 +196,8 @@ For a **remote** OpenShift experience without standing up AWS yourself, the [Red
 
 | | |
 |--|--|
-| **Learn** | **ROSA** in your AWS account; **OpenShift** + **`Route`** as the prod-like edge (Barclays-aligned); minimal **CI deploy** to the cluster; **lab cost control** (stop/start, not 24/7). |
-| **Build** | Stand up **ROSA** (CLI and/or Terraform as agreed); reuse **`k8s/`** + **`openshift/route.yaml`**; ECR pull + Stripe **Secrets** on cluster; **`docs/rosa/`** runbook (or extend **`docs/openshift/`**); **`scripts/`** or **Makefile** targets for **lab on/off** (e.g. **`rosa stop cluster`** / **`rosa start cluster`**); optional **GHA** deploy job (**`workflow_dispatch`** or gated). |
+| **Learn** | **ROSA** in your AWS account; **OpenShift** + **`Route`** as the prod-like edge (Barclays-aligned); **Terraform + CI deploy** on **`push` to `main`**; **lab cost control** (stop/start, not 24/7). |
+| **Build** | **`infra/terraform/rosa/`** (separate state) with **`lab_enabled`**; reuse **`k8s/`** + **`openshift/route.yaml`** (parameterised image for CI); **GHA deploy** after **ECR push** (skips when cluster stopped); **GH Actions secrets** → cluster **Secrets** at deploy; **`docs/rosa/`** runbook; **`scripts/`** / **Makefile** **lab on/off**. Implementation order: **[docs/branches/15-rosa-lab-deploy.md](docs/branches/15-rosa-lab-deploy.md)**. |
 | **Done when** | Public **`curl https://<route-host>/readyz`** returns **`cmd/api`** JSON; a webhook (Stripe Dashboard or **`stripe listen`**) hits the **ROSA** URL and **`oc logs`** shows structured traces; **documented** one-command (or short-script) **lab off** and **lab on** without losing the repo story. |
 
 **Out of scope for M7:** RDS, idempotency, Kafka, full External Secrets / Vault automation (see **Stretch** below).
@@ -282,9 +282,10 @@ Record short, dated bullets as you go (examples below).
 - **2026-05-27** - **Milestone 6 handler stack:** **`Recover(RequestLog(app.routes()))`** in **`main`** - **Recover** outermost (catches panics in logging middleware and handlers); **`RequestLog`** wraps routes and the response-recording **`ResponseWriter`**.
 - **2026-05-27** - **Prod-like deploy target:** **ROSA** + **Route** in learner **AWS** account (**Phase C**). **OpenShift Sandbox** (**Phase B**) is frozen after **M5**; not the foundation for **M7+**.
 - **2026-05-27** - **Milestone renumber:** **M7** = **ROSA lab deploy** + cost on/off; **M8** = **idempotency** + **RDS Postgres**; **M9** = **Kafka**. **EKS** is not the primary path.
+- **2026-05-27** - **M7 automation:** **Terraform** in **`infra/terraform/rosa/`**; **GHA deploy on `push` to `main`** (no **`workflow_dispatch`**); **GH secrets** for Stripe/ROSA at deploy; CI **skips** when lab stopped; **`lab_enabled`** + **`rosa stop`/`start`** scripts.
 
 ## Open questions
 
-- **ROSA provisioning:** **`rosa` CLI** first vs **Terraform ROSA provider** from day one (document choice in **`15-rosa-lab-deploy`**).
-- **Secret / deploy automation:** minimal **GHA **`oc apply`** in **M7**; full **External Secrets** / rotation in **Stretch** unless **Barclays** defines a standard pattern.
+- **ROSA Terraform module/provider:** pick exact provider version and minimal worker shape during **Phase 1** (see **`15-rosa-lab-deploy`**).
+- **Manifest parameterisation:** kustomize vs **envsubst** in CI (decide in **Phase 3**).
 - *Example for later:* managed Kafka vs self-run (Milestone **9**).
