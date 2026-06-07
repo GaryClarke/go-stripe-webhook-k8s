@@ -22,7 +22,7 @@ A later phase introduces **Kafka** to decouple ingestion from processing.
 - No storage of full payment card data or broad PCI scope expansion.
 - No production-grade Helm chart or full GitOps story in early milestones.
 - No bespoke retry or operations dashboard until basics are solid.
-- **No AWS-centric deploy milestone in v1** (no EKS + IAM + VPC as the default learning path). You still deploy **Kubernetes** for real—first on a **local cluster**; optional **Phase B** can add a registry and a remote cluster (OpenShift sandbox, ROSA, EKS, etc.) without changing the app shape.
+- **No EKS / vanilla Ingress** as the primary learning path (Barclays-aligned **OpenShift + Route** on **ROSA** is **Phase C**, Milestone 7). You still deploy **Kubernetes** for real—first on a **local cluster**; **Phase B** (Sandbox) was a free Route checkpoint; **Phase C** is the prod-like target in **your** AWS account.
 
 ## Deployment phases
 
@@ -31,9 +31,10 @@ The **application** stays the same: Go HTTP server → Dockerfile → Deployment
 | Phase | Where | What you add |
 |--------|--------|----------------|
 | **A — Local cluster (default through Milestone 4)** | Docker Desktop Kubernetes, Minikube, or kind | `kubectl apply`, same manifests; image via local daemon / `kind load` as needed |
-| **B — Remote cluster (optional later)** | e.g. OpenShift Developer Sandbox, managed OpenShift/Kubernetes, or EKS | Container registry (`docker push`, pull secrets), `kubeconfig`, cluster Secrets; **same YAML** if you keep config portable |
+| **B — OpenShift Sandbox (checkpoint, M5)** | [OpenShift Developer Sandbox](https://developers.redhat.com/developer-sandbox) | Same **`k8s/`** + **`openshift/route.yaml`**; **`oc`**, ECR pull **Secrets**; **not** extended after **Milestone 7** |
+| **C — ROSA lab (Milestone 7)** | [ROSA](https://www.redhat.com/en/technologies/cloud-computing/openshift/aws) in **your** AWS account | Real OpenShift + **Route**, CI deploy, **cost on/off** scripts; reuse **Phase A/B** YAML |
 
-**Why local first:** Learn Pods, Deployments, Services, probes, and logs without splitting attention across cloud networking and IAM. **Phase B** reuses the same artefacts and teaches registry + credentials when you want a public URL or team-aligned environment.
+**Why local first:** Learn Pods, Deployments, Services, probes, and logs without splitting attention across cloud networking and IAM. **Phase B** proved **Route** concepts on free Sandbox. **Phase C** is the Barclays-aligned prod-like environment (**OpenShift on AWS**, not EKS).
 
 ## How to use this plan
 
@@ -55,7 +56,7 @@ Each milestone lists **what to learn**, **what changes in the repo**, and **how 
 
 **Milestone 1 status:** Complete on **`main`**: probes, webhook stub, graceful shutdown, **`Recover`**, **`internal/dbg`**, tests including **`TestAPI_Readyz`**. **Milestone 2** verification landed on **`8-stripe-webhook-verify`** (see [Milestone 2](#milestone-2-configuration-and-secrets)).
 
-**Note on readiness:** For v1, `/readyz` may match `/livez` until **Milestone 7** adds shared dependencies (e.g. DB/Redis) for idempotency. Document the chosen rule under [Decisions](#decisions) when it changes.
+**Note on readiness:** For v1, `/readyz` may match `/livez` until **Milestone 8** adds shared dependencies (managed **Postgres** for idempotency). Document the chosen rule under [Decisions](#decisions) when it changes.
 
 **`cmd/api` layout:** HTTP routes are registered on **`(*App).routes()`** (`cmd/api/app.go`); handlers live in **`cmd/api/handlers.go`**. **`main`** loads config, **`NewApp`**, **`Recover(app.routes())`**, and server lifecycle only. **`POST /webhooks/stripe`** uses **`app.cfg.StripeWebhookSecret`** with **`stripe.ConstructEvent`**. **Future:** pass more dependencies on **`App`** (e.g. downstream clients).
 
@@ -94,7 +95,7 @@ Each milestone lists **what to learn**, **what changes in the repo**, and **how 
 6. Tests for config loading (missing var, default **`PORT`**, valid **`Load`**).
 7. Stripe signature verification after config is wired.
 
-**Roadmap context:** **Kubernetes / OpenShift** Secrets and **`securityContext`** stay in **Milestones 3–4** so they do not block local config work. **Observability** before **idempotency** (**Milestones 6 then 7**) remains the agreed order.
+**Roadmap context:** **Kubernetes / OpenShift** Secrets and **`securityContext`** stay in **Milestones 3–4** so they do not block local config work. **Observability** (**M6**) before **ROSA deploy** (**M7**) before **idempotency** (**M8**) remains the agreed order.
 
 ---
 
@@ -172,13 +173,13 @@ For a **remote** OpenShift experience without standing up AWS yourself, the [Red
 | **Build** | Consistent JSON (or agreed format) to **stdout**; **response-wrapping** middleware (request ID, request start/end or equivalent); log Stripe **event id**, **type**, outcome, and errors (no secrets or raw card data). Revisit **`Recover`** in **`cmd/api/recover.go`** with that middleware so panics after the response has started do not fight **`http.Error`** (track response-started, or log-only on panic). Optional **`docs/branches/`** note: example **`oc logs`** / **`grep`** today and example field searches for a future central system. |
 | **Done when** | `kubectl logs` / `oc logs` is enough to trace a single webhook through the service (answer: what happened to this event?). |
 
-**Ordering:** This milestone sits **before idempotency** (Milestone 7) so logs help debug duplicate delivery and storage behaviour.
+**Ordering:** This milestone sits **before idempotency** (Milestone 8) so logs help debug duplicate delivery and storage behaviour.
 
 **Out of scope for M6:** Installing Datadog, ELK, CloudWatch, or cluster logging stacks; metrics, tracing, dashboards, alerting.
 
 **Recover / partial response (deferred from Milestone 1, in scope for M6):** If a handler **panics after** it has already started the response (e.g. **`WriteHeader`** or body bytes on the wire), **`http.Error`** in **`Recover`** cannot reliably turn the client-visible outcome into **500** - see **`cmd/api/recover.go`**. **M6** includes aligning **middleware + `Recover`** (e.g. wrapped **`http.ResponseWriter`**, **`http.ResponseController`**, or log-only after write started) so panic handling does not double-write or corrupt the stream.
 
-**Milestone 6 status:** **Complete** on **`main`** via **`14-structured-logging`**. Branch doc: **[docs/branches/14-structured-logging.md](docs/branches/14-structured-logging.md)**. Shipped: JSON **`slog`**, **`RequestLog`**, **`request_id`** on context, **`logmsg`** contract, handler correlation. **Phase 4** (**Recover** + **`response_started`** on panic after write started) deferred to a follow-up branch. **Sandbox:** after CI pushes ECR **`latest`**, **`oc rollout restart`** and confirm **`oc logs`** JSON trace (local verify done). **Next:** **Milestone 7** (idempotency).
+**Milestone 6 status:** **Complete** on **`main`** via **`14-structured-logging`**. Branch doc: **[docs/branches/14-structured-logging.md](docs/branches/14-structured-logging.md)**. Shipped: JSON **`slog`**, **`RequestLog`**, **`request_id`** on context, **`logmsg`** contract, handler correlation. Optional polish deferred to **Stretch: Observability polish** below. **Next:** **Milestone 7** (ROSA lab deploy).
 
 **Implementation order (summary):**
 
@@ -191,19 +192,37 @@ For a **remote** OpenShift experience without standing up AWS yourself, the [Red
 
 ---
 
-## Milestone 7: Idempotency
+## Milestone 7: ROSA lab deploy (Phase C)
 
 | | |
 |--|--|
-| **Learn** | Stripe retries; duplicate delivery; `event.id`; **shared state across replicas**. |
-| **Build** | Persist processed event IDs (e.g. DB or Redis)—not in-memory dedupe for real behaviour. |
-| **Done when** | Sending the same Stripe event twice results in **one** effective processing path. |
+| **Learn** | **ROSA** in your AWS account; **OpenShift** + **`Route`** as the prod-like edge (Barclays-aligned); minimal **CI deploy** to the cluster; **lab cost control** (stop/start, not 24/7). |
+| **Build** | Stand up **ROSA** (CLI and/or Terraform as agreed); reuse **`k8s/`** + **`openshift/route.yaml`**; ECR pull + Stripe **Secrets** on cluster; **`docs/rosa/`** runbook (or extend **`docs/openshift/`**); **`scripts/`** or **Makefile** targets for **lab on/off** (e.g. **`rosa stop cluster`** / **`rosa start cluster`**); optional **GHA** deploy job (**`workflow_dispatch`** or gated). |
+| **Done when** | Public **`curl https://<route-host>/readyz`** returns **`cmd/api`** JSON; a webhook (Stripe Dashboard or **`stripe listen`**) hits the **ROSA** URL and **`oc logs`** shows structured traces; **documented** one-command (or short-script) **lab off** and **lab on** without losing the repo story. |
 
-In-memory dedupe is acceptable only as a **demonstration** with explicit “single replica only” caveats.
+**Out of scope for M7:** RDS, idempotency, Kafka, full External Secrets / Vault automation (see **Stretch** below).
+
+**Sandbox:** **`docs/openshift/sandbox-runbook.md`** stays as **Phase B** history; do not block M7 on Sandbox token or ECR refresh.
+
+**Branch (suggested):** **`15-rosa-lab-deploy`** — see **[docs/branches/15-rosa-lab-deploy.md](docs/branches/15-rosa-lab-deploy.md)**.
 
 ---
 
-## Milestone 8: Kafka
+## Milestone 8: Idempotency
+
+| | |
+|--|--|
+| **Learn** | Stripe retries; duplicate delivery; **`event.id`**; **shared state across replicas**; managed **Postgres** (Terraform **RDS** in same AWS account / VPC as ROSA). |
+| **Build** | **`processed_events`** with **`UNIQUE(event_id)`**; atomic **`INSERT … ON CONFLICT DO NOTHING`** (no check-then-insert); **`DATABASE_URL`** from env; local **Docker Compose** Postgres for dev; **RDS** for ROSA; **`replicas: 2+`** to prove cross-Pod dedupe; structured logs (**`stripe_event_duplicate_skipped`**, etc.); **`/readyz`** checks DB. |
+| **Done when** | Same **`event_id`** twice → **one** row in store, duplicate returns **204**, logs show skip on second delivery; works with **multiple Pods** on ROSA. |
+
+In-memory dedupe is acceptable only as a **demonstration** with explicit “single replica only” caveats.
+
+**Store choice (locked):** **Postgres** (not Redis) for durable idempotency and audit.
+
+---
+
+## Milestone 9: Kafka
 
 | | |
 |--|--|
@@ -215,9 +234,23 @@ You do not need a full cluster-distributed Kafka on day one; pick one local stor
 
 ---
 
+## Stretch (not numbered): Observability polish (deferred from M6)
+
+**Why:** **Milestone 6** shipped structured logs, **`request_id`** correlation, and **`oc logs`** traceability. The items below are **not** required for webhook debugging or **Milestone 8** idempotency work; pick them up **after M9** (or when hardening for production narratives).
+
+| | |
+|--|--|
+| **Recover + response started** | **`Recover`** is outermost; on panic it always **`http.Error(500)`**. If a handler **already started** the response (**`WriteHeader`** or body bytes), that can double-write or corrupt the stream. **Stretch:** share **`responseRecorder.wroteHeader`** (or **`http.ResponseController`**) with **`Recover`**; log **`response_started`** on **`msgPanic`**; skip **`http.Error`** when the response already started; use **`loggerFromContext`** so panics include **`request_id`**. |
+| **`event_id` on `request_completed`** | **`stripe_event_accepted`** already logs **`event_id`** and **`event_type`**. **Stretch:** stash **`event_id`** on **`context`** after **`ConstructEvent`** and add it to **`request_completed`** for **`POST /webhooks/stripe`** (single-line access log in central search). |
+| **Finer `duration_ms`** | Integer **`duration_ms`** truncates sub-millisecond handlers to **0** (common on fast webhooks). **Stretch:** add **`duration_us`** or document **0 = &lt; 1 ms** in runbooks. |
+
+**Does the service “work” without this stretch?** Yes. **Sandbox** and **`oc logs`** tracing by **`request_id`** + **`event_id`** are sufficient for **M6 done when**.
+
+---
+
 ## Stretch (not numbered): OpenShift deploy job + secret automation
 
-**Why:** **Milestones 4–5** use **documented **`kubectl` / `oc`** commands** to create **pull** and **Stripe** **Secrets**. That is deliberate for learning. **Employer-style production** usually **automates** how **Secret** *values* arrive (no long-lived human **`oc create`** for every env). This stretch is **explicitly out of scope** for the numbered **M6–M8** ordering so **Observability → Idempotency → Kafka** stays intact.
+**Why:** **Milestones 4–5** use **documented **`kubectl` / `oc`** commands** to create **pull** and **Stripe** **Secrets**. That is deliberate for learning. **Employer-style production** usually **automates** how **Secret** *values* arrive (no long-lived human **`oc create`** for every env). Minimal deploy from CI is **in scope for M7**; full **External Secrets** / rotation automation stays **stretch** after **M9**.
 
 | | |
 |--|--|
@@ -247,8 +280,11 @@ Record short, dated bullets as you go (examples below).
 - **2026-05-27** - **Milestone 6 access logs:** **`RequestLog`** middleware skips **`request_started`** / **`request_completed`** for **`GET /livez`** and **`GET /readyz`** (probe noise); all other routes logged at **info**. Handlers may still use minimal probe logs only if needed (default: none).
 - **2026-05-27** - **Milestone 6 Stripe tracing:** **`request_id`** on every HTTP log line (middleware + handlers). After successful **`ConstructEvent`**, add **`event_id`** and **`event_type`** on all webhook handler logs for that request; on verify/read failures, log **`request_id`** only (no **`event_id`** until parsed). **`event_id`** is the stable key across retries and future milestones (idempotency, Kafka); **`request_id`** is one delivery attempt.
 - **2026-05-27** - **Milestone 6 handler stack:** **`Recover(RequestLog(app.routes()))`** in **`main`** - **Recover** outermost (catches panics in logging middleware and handlers); **`RequestLog`** wraps routes and the response-recording **`ResponseWriter`**.
+- **2026-05-27** - **Prod-like deploy target:** **ROSA** + **Route** in learner **AWS** account (**Phase C**). **OpenShift Sandbox** (**Phase B**) is frozen after **M5**; not the foundation for **M7+**.
+- **2026-05-27** - **Milestone renumber:** **M7** = **ROSA lab deploy** + cost on/off; **M8** = **idempotency** + **RDS Postgres**; **M9** = **Kafka**. **EKS** is not the primary path.
 
 ## Open questions
 
-- **Secret / deploy automation:** after **Milestone 5** (Route + public URL), pick one **Stretch** approach (e.g. **GitHub Actions **`oc apply`** + secret sync from **`GH` Secrets**, or **External Secrets Operator** sketch) or defer if **Barclays** defines a standard pattern.
-- *Examples for later:* Redis vs SQL for idempotency (Milestone **7**); managed Kafka vs self-run (Milestone **8**).
+- **ROSA provisioning:** **`rosa` CLI** first vs **Terraform ROSA provider** from day one (document choice in **`15-rosa-lab-deploy`**).
+- **Secret / deploy automation:** minimal **GHA **`oc apply`** in **M7**; full **External Secrets** / rotation in **Stretch** unless **Barclays** defines a standard pattern.
+- *Example for later:* managed Kafka vs self-run (Milestone **9**).

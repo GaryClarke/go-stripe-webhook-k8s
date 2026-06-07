@@ -2,6 +2,8 @@
 
 Commands and flows for deploying **go-stripe-webhook-k8s** on **[OpenShift Developer Sandbox](https://developers.redhat.com/developer-sandbox)** using the same **`k8s/`** manifests as local Kubernetes. Concepts transfer to employer clusters (**OpenShift**) even when exact commands (**`oc`** vs **`kubectl`**, RBAC, quotas) differ.
 
+**Phase B checkpoint (M5):** Sandbox proved **Route** + **`oc`** flows. **Primary prod-like env from Milestone 7 onward is ROSA** — see **[PLAN.md](../../PLAN.md)** Phase **C** and **[docs/branches/15-rosa-lab-deploy.md](../branches/15-rosa-lab-deploy.md)**.
+
 **Related:** roadmap **[PLAN.md](../../PLAN.md)** Milestone **5** (routing); Stretch **deploy + secret automation** for pipeline / operator patterns later.
 
 ## Session startup (typical workday)

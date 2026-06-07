@@ -4,7 +4,7 @@
 
 **Git branch:** `14-structured-logging`
 
-**Status:** **Complete** (merged to **`main`**). Local Phase 5 verified (`go test`, unsigned curl, **`stripe listen --latest`** + **204**). **Sandbox:** after CI pushes ECR **`latest`**, **`oc rollout restart`** then **`oc logs`** for JSON + **`request_id`** (see **How to verify**). **Phase 4** (**Recover** + **`response_started`**) deferred to a follow-up branch.
+**Status:** **Complete** (merged to **`main`**). Local and **Sandbox** Phase 5 verified (JSON **`oc logs`**, shared **`request_id`** + **`event_id`**). Optional polish → **[PLAN.md](../../PLAN.md) Stretch: Observability polish**.
 
 ---
 
@@ -89,8 +89,8 @@ Common envelope: `time`, `level`, `msg`, plus handler-specific keys. **No** secr
 | **1** | **`slog`** JSON foundation; **`App.logger`**; migrate **`log`** in **`main`**, **`handlers`**, **`recover`** | **Done** |
 | **2** | **RequestLog**, request ID, **`Recover(logger, RequestLog(logger, app.routes()))`** | **Done** |
 | **3** | Handlers use **`loggerFromContext`**; **`event_id`** / **`event_type`** after verify | **Done** |
-| **4** | **Recover** + **`response_started`** (no double-write on panic) | **Deferred** — follow-up branch |
-| **5** | Verify **`go test`**, local run, **`oc logs`** | **Done** locally; **Sandbox** after merge + CI ECR push + **`oc rollout restart`** |
+| **4** | **Recover** + **`response_started`** (no double-write on panic) | **Stretch** — see **PLAN** |
+| **5** | Verify **`go test`**, local run, **`oc logs`** | **Done** |
 
 ---
 
@@ -148,7 +148,6 @@ Adapt syntax to ELK/KQL, Datadog, or CloudWatch Logs Insights when your platform
 
 ## Follow-ups
 
-- **Phase 4:** **Recover** + **`response_started`** when panic after **`WriteHeader`** / body bytes (optional branch).
-- **`event_id`** on **`request_completed`** (PLAN optional; handler line has **`event_id`** today).
-- **Milestone 7:** Idempotency - logs should show duplicate **`event_id`** attempts.
-- **Stretch:** CI deploy + secret automation (**PLAN** Stretch section).
+- **Milestone 8:** Idempotency — logs should show duplicate **`event_id`** attempts.
+- **End-of-project stretch (not blocking M6):** **[PLAN.md](../../PLAN.md) Stretch: Observability polish** — **Recover** + **`response_started`**, **`event_id` on `request_completed`**, finer **`duration_ms`**.
+- **Stretch:** CI deploy + secret automation (**PLAN** OpenShift deploy stretch).
