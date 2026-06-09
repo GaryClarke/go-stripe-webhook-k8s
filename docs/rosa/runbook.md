@@ -2,6 +2,31 @@
 
 Operational guide for **Phase C** ([**PLAN.md**](../../PLAN.md) Milestone 7). **Build order** lives in **[docs/branches/15-rosa-lab-deploy.md](../branches/15-rosa-lab-deploy.md)** — this file is for day-two ops once implemented.
 
+**Chat shorthand:** **`start work`** — see **[cursor-rules.md](../../cursor-rules.md)** (agent runs **`make lab-status`**; you only do interactive auth / secrets when prompted).
+
+---
+
+## Session startup (typical workday)
+
+**One command (agent or you):**
+
+```bash
+make lab-status
+```
+
+**You only run these when `lab-status` says `>>> YOU:`**
+
+| Situation | Command |
+|-----------|---------|
+| **`rosa` token expired** | `rosa login --use-auth-code` |
+| **`oc` not logged in** | `oc login https://api.gc-rosa-lab.bd91.p1.openshiftapps.com:6443 -u garyc -p '<password>'` then `oc project go-stripe-webhook` |
+| **`ImagePullBackOff`** | `make lab-ecr-refresh` (needs `aws` CLI) |
+| **Webhook 400 / new Stripe destination** | Update `stripe-webhook-secret` with Dashboard **`whsec`** (not `stripe listen`), then `oc rollout restart deployment/go-stripe-webhook-k8s` |
+
+**Not daily:** cluster create, IDP, first `oc apply`, Stripe Dashboard endpoint setup (once per environment).
+
+**Health URL:** `https://go-stripe-webhook-k8s-go-stripe-webhook.apps.gc-rosa-lab.bd91.p1.openshiftapps.com/readyz`
+
 ---
 
 ## Lab on / lab off
@@ -9,11 +34,9 @@ Operational guide for **Phase C** ([**PLAN.md**](../../PLAN.md) Milestone 7). **
 **Prefer stop/start** over delete/recreate (faster turn-around).
 
 ```bash
-# Stop workers — lower cost; Route/API may be unavailable until start
-make lab-off    # or: ./scripts/rosa-lab-off.sh
-
-# Start again before learning or before expecting CI deploy to run
-make lab-on     # or: ./scripts/rosa-lab-on.sh
+# Planned: make lab-off / make lab-on (scripts not yet added)
+# Today: console may only offer Delete; rosa stop unavailable on some CLI versions.
+# Leaving cluster "ready" overnight is OK for short lab use; use Delete only for long breaks.
 ```
 
 When the cluster is **stopped**, **GitHub Actions deploy** should **skip** (not fail). Turn the lab **on** before merging to **`main`** if you need that push deployed immediately.
