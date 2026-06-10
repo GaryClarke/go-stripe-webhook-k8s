@@ -33,7 +33,7 @@ Use this file as guardrails for AI and humans working in this repo. Keep it upda
   2. **If exit 0:** reply in **short** form: cluster ready, **`oc`** user, pod Running, **`/readyz`** OK. Optional one-liner for logs: **`oc logs -l app=go-stripe-webhook-k8s --tail=30`**.
   3. **If exit 1** or the script prints **`>>> YOU:`** lines: quote those prompts verbatim and tell the user to run the listed commands **themselves**, then say **`start work`** again (or **`make lab-status`**). Typical **user-only** steps (interactive or secret):
      - **`rosa login --use-auth-code`** — Red Hat SSO in the browser when **`rosa`** token expired.
-     - **`oc login https://api.gc-rosa-lab.bd91.p1.openshiftapps.com:6443 -u garyc -p '...'`** — htpasswd password; never committed or pasted to the agent.
+     - **`oc login https://api.gc-rosa-lab.dtrf.p1.openshiftapps.com:6443 -u garyc -p '...'`** — htpasswd password; never committed or pasted to the agent.
      - **`make lab-ecr-refresh`** — when **`ImagePullBackOff`** (ECR token ~12h); needs **`aws`** credentials locally.
      - **Stripe `whsec`** — only when Dashboard destination changes: **`oc create secret generic stripe-webhook-secret ...`** then rollout; user supplies **`whsec`** locally, not in chat.
   4. **Do not** re-run full Phase 1 deploy (**`rosa create cluster`**, **`oc apply`**, IDP setup) on **`start work`** unless **`lab-status`** shows cluster/app missing.

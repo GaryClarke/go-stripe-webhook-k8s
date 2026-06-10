@@ -187,10 +187,10 @@ Work **in this sequence**. Each phase has a **done gate** before the next.
 
 ## Verify checklist
 
-- [ ] Phase 0: ROSA + AWS linked
-- [ ] Phase 1: Terraform creates cluster; **`oc get nodes`**
+- [x] Phase 0: ROSA + AWS linked
+- [x] Phase 1: Cluster ready; **`oc get nodes`** (manual **`rosa create`** on Path A; Terraform deferred)
 - [ ] Phase 2: CI AWS/OIDC permissions documented
-- [ ] Phase 3: Image deployable without hardcoded SHA in git
+- [x] Phase 3: **`k8s/base`** + **`k8s/overlays/rosa`**; **`oc apply -k`**; image via kustomize transformer
 - [ ] Phase 4: Push **`main`** deploys automatically
 - [ ] Phase 5: **`lab-on`** / **`lab-off`** + CI skip when stopped
 - [ ] Phase 6: Public **`/readyz`** + Stripe webhook + **`oc logs`**

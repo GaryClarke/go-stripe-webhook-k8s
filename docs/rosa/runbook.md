@@ -19,13 +19,15 @@ make lab-status
 | Situation | Command |
 |-----------|---------|
 | **`rosa` token expired** | `rosa login --use-auth-code` |
-| **`oc` not logged in** | `oc login https://api.gc-rosa-lab.bd91.p1.openshiftapps.com:6443 -u garyc -p '<password>'` then `oc project go-stripe-webhook` |
+| **`oc` not logged in** | `oc login https://api.gc-rosa-lab.dtrf.p1.openshiftapps.com:6443 -u garyc -p '<password>'` then `oc project go-stripe-webhook` |
 | **`ImagePullBackOff`** | `make lab-ecr-refresh` (needs `aws` CLI) |
 | **Webhook 400 / new Stripe destination** | Update `stripe-webhook-secret` with Dashboard **`whsec`** (not `stripe listen`), then `oc rollout restart deployment/go-stripe-webhook-k8s` |
 
 **Not daily:** cluster create, IDP, first `oc apply`, Stripe Dashboard endpoint setup (once per environment).
 
-**Health URL:** `https://go-stripe-webhook-k8s-go-stripe-webhook.apps.gc-rosa-lab.bd91.p1.openshiftapps.com/readyz`
+**Health URL:** `https://go-stripe-webhook-k8s-go-stripe-webhook.apps.gc-rosa-lab.dtrf.p1.openshiftapps.com/readyz` (DNS suffix changes after cluster recreate - use `oc get route` or `rosa describe cluster` for the current host).
+
+**Deploy (manual):** `oc apply -k k8s/overlays/rosa` (after `ecr-registry` and `stripe-webhook-secret` exist in project `go-stripe-webhook`).
 
 ---
 
@@ -49,7 +51,7 @@ When the cluster is **stopped**, **GitHub Actions deploy** should **skip** (not 
 
 - **Trigger:** every **`push` to `main`** (after image push to ECR).
 - **No** manual **`workflow_dispatch`** for normal deploys.
-- Deploy job: login **`oc`**, sync Secrets, apply **`k8s/`** + **`openshift/route.yaml`**, set image to **`github.sha`**, smoke **`/readyz`**.
+- Deploy job: login **`oc`**, sync Secrets, **`oc apply -k k8s/overlays/rosa`** with image tag **`github.sha`**, smoke **`/readyz`**.
 
 ---
 

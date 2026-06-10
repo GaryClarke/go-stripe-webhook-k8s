@@ -1,0 +1,7 @@
+# Tells Kustomize which YAML files belong to the shared base (all environments)
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+    - deployment.yaml
+    - service.yaml
