@@ -1,7 +1,7 @@
 # Integration Engine - common tasks
 # See docs/PROJECT_KNOWLEDGE.md for project overview.
 
-.PHONY: build test lint tidy fmt lab-status lab-ecr-refresh
+.PHONY: build test lint tidy fmt lab-status lab-ecr-refresh lab-on lab-off
 
 # ROSA lab (gc-rosa-lab) — see docs/rosa/runbook.md and cursor-rules.md "start work"
 lab-status:
@@ -9,6 +9,12 @@ lab-status:
 
 lab-ecr-refresh:
 	./scripts/rosa-lab-ecr-secret.sh
+
+lab-on:
+	./scripts/rosa-lab-on.sh
+
+lab-off:
+	./scripts/rosa-lab-off.sh
 
 build:
 	go build ./...

@@ -33,15 +33,22 @@ make lab-status
 
 ## Lab on / lab off
 
-**Prefer stop/start** over delete/recreate (faster turn-around).
+Hibernate / **`rosa stop`** is not available on this account. Use **delete / recreate** to stop billing.
 
-```bash
-# Planned: make lab-off / make lab-on (scripts not yet added)
-# Today: console may only offer Delete; rosa stop unavailable on some CLI versions.
-# Leaving cluster "ready" overnight is OK for short lab use; use Delete only for long breaks.
-```
+| When | Command |
+|------|---------|
+| **End of day** | `make lab-off` (deletes cluster; ~10-20 min uninstall) |
+| **Start of day** | `make lab-on` (creates cluster if missing, or prints status + checklist) |
+| **Cluster ready** | Follow checklist from `make lab-on` (GitHub **`ROSA_API_URL`**, Stripe URL, IDP/setup) |
+| **Working** | `make lab-status` |
 
-When the cluster is **stopped**, **GitHub Actions deploy** should **skip** (not fail). Turn the lab **on** before merging to **`main`** if you need that push deployed immediately.
+**Morning must-dos after recreate** (DNS suffix changes each time):
+
+1. **GitHub variable `ROSA_API_URL`** — copy API URL from `rosa describe cluster` (no spaces).
+2. **Stripe** — edit existing webhook endpoint URL (same `whsec` usually).
+3. **Fresh cluster** — IDP, `oc new-project`, secrets (or rely on CI deploy after step 1).
+
+When the cluster is **off**, **Deploy ROSA** on push to **`main`** **skips** (exit 0, not a failure). Turn the lab **on** and update **`ROSA_API_URL`** before you need CI deploy to land.
 
 **Terraform:** **`lab_enabled=false`** is for longer breaks (optional destroy path — document in **`infra/terraform/rosa/README.md`** once added).
 
