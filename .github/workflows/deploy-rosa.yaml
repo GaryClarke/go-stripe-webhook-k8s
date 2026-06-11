@@ -1,0 +1,101 @@
+# Deploy to ROSA after CI pushes a new image to ECR.
+# Skips gracefully when the lab cluster is off (deleted / not ready).
+#
+# Prerequisites: GitHub secrets OC_LAB_PASSWORD, STRIPE_WEBHOOK_SECRET
+# Variables: AWS_ROLE_ARN, AWS_REGION, ECR_REPOSITORY, ROSA_API_URL
+name: Deploy ROSA
+
+on:
+    workflow_run:
+        workflows: [CI]
+        types: [completed]
+        branches: [main]
+
+permissions:
+    contents: read
+    id-token: write
+
+jobs:
+    deploy:
+        if: ${{ github.event.workflow_run.conclusion == 'success' }}
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout built commit
+              uses: actions/checkout@v4
+              with:
+                  ref: ${{ github.event.workflow_run.head_sha }}
+
+            - name: Show commit
+              run: |
+                  echo "Deploying SHA: ${{ github.event.workflow_run.head_sha }}"
+                  git rev-parse HEAD
+
+            - name: Install OpenShift CLI
+              run: |
+                  curl -fsSL https://mirror.openshift.com/pub/openshift-v4/clients/ocp/stable-4.20/openshift-client-linux.tar.gz | sudo tar -xz -C /usr/local/bin oc
+                  oc version --client
+
+            - name: Configure AWS credentials (OIDC)
+              uses: aws-actions/configure-aws-credentials@v4
+              with:
+                  role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+                  aws-region: ${{ vars.AWS_REGION || 'eu-west-1' }}
+
+            - name: OpenShift login (skip deploy if lab off)
+              id: oc
+              env:
+                  API_URL: ${{ vars.ROSA_API_URL }}
+                  OC_LAB_PASSWORD: ${{ secrets.OC_LAB_PASSWORD }}
+              run: |
+                  set -euo pipefail
+                  if [ -z "${API_URL}" ]; then
+                      echo "skip=true" >> "$GITHUB_OUTPUT"
+                      echo "ROSA_API_URL not set — skipping deploy."
+                      exit 0
+                  fi
+                  if ! oc login "$API_URL" -u garyc -p "$OC_LAB_PASSWORD"; then
+                      echo "skip=true" >> "$GITHUB_OUTPUT"
+                      echo "oc login failed — cluster likely off or URL stale. Skipping deploy."
+                      exit 0
+                  fi
+                  oc project go-stripe-webhook
+                  echo "skip=false" >> "$GITHUB_OUTPUT"
+                  oc whoami
+
+            - name: Sync pull and app secrets
+              if: steps.oc.outputs.skip != 'true'
+              env:
+                  AWS_REGION: ${{ vars.AWS_REGION || 'eu-west-1' }}
+                  ECR_REGISTRY: 234290944523.dkr.ecr.${{ vars.AWS_REGION || 'eu-west-1' }}.amazonaws.com
+                  STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
+              run: |
+                  oc create secret docker-registry ecr-registry \
+                    --docker-server="$ECR_REGISTRY" \
+                    --docker-username=AWS \
+                    --docker-password="$(aws ecr get-login-password --region "$AWS_REGION")" \
+                    --dry-run=client -o yaml | oc apply -f -
+
+                  oc create secret generic stripe-webhook-secret \
+                    --from-literal=STRIPE_WEBHOOK_SECRET="$STRIPE_WEBHOOK_SECRET" \
+                    --dry-run=client -o yaml | oc apply -f -
+
+            - name: Apply manifests and roll out image
+              if: steps.oc.outputs.skip != 'true'
+              env:
+                  IMAGE_TAG: ${{ github.event.workflow_run.head_sha }}
+                  AWS_REGION: ${{ vars.AWS_REGION || 'eu-west-1' }}
+                  REPOSITORY: ${{ vars.ECR_REPOSITORY || 'go-stripe-webhook-k8s' }}
+                  REGISTRY: 234290944523.dkr.ecr.${{ vars.AWS_REGION || 'eu-west-1' }}.amazonaws.com
+              run: |
+                  oc apply -k k8s/overlays/rosa
+                  oc set image deployment/go-stripe-webhook-k8s \
+                    api="${REGISTRY}/${REPOSITORY}:${IMAGE_TAG}" \
+                    -n go-stripe-webhook
+                  oc rollout status deployment/go-stripe-webhook-k8s -n go-stripe-webhook --timeout=5m
+
+            - name: Smoke test readyz
+              if: steps.oc.outputs.skip != 'true'
+              run: |
+                  ROUTE_HOST=$(oc get route go-stripe-webhook-k8s -n go-stripe-webhook -o jsonpath='{.spec.host}')
+                  echo "https://${ROUTE_HOST}/readyz"
+                  curl -fsS "https://${ROUTE_HOST}/readyz"

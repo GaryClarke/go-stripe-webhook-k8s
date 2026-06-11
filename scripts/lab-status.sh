@@ -7,9 +7,9 @@ set -euo pipefail
 
 CLUSTER_NAME="${ROSA_CLUSTER_NAME:-gc-rosa-lab}"
 OC_PROJECT="${OC_PROJECT_NAME:-go-stripe-webhook}"
-# DNS suffix (e.g. dtrf) changes when the cluster is deleted and recreated; override via env if needed.
-API_URL="${ROSA_API_URL:-https://api.gc-rosa-lab.dtrf.p1.openshiftapps.com:6443}"
-ROUTE_HOST="${ROSA_ROUTE_HOST:-go-stripe-webhook-k8s-go-stripe-webhook.apps.gc-rosa-lab.dtrf.p1.openshiftapps.com}"
+# DNS suffix (e.g. upgg) changes when the cluster is deleted and recreated; override via env if needed.
+API_URL="${ROSA_API_URL:-https://api.gc-rosa-lab.upgg.p1.openshiftapps.com:6443}"
+ROUTE_HOST="${ROSA_ROUTE_HOST:-go-stripe-webhook-k8s-go-stripe-webhook.apps.gc-rosa-lab.upgg.p1.openshiftapps.com}"
 READYZ_URL="https://${ROUTE_HOST}/readyz"
 DEPLOYMENT="${K8S_DEPLOYMENT_NAME:-go-stripe-webhook-k8s}"
 
