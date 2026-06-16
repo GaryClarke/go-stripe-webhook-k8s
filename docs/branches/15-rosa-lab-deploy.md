@@ -2,7 +2,21 @@
 
 **Goal:** **[PLAN.md](../../PLAN.md) Milestone 7** — **Phase C**: **ROSA** in your **AWS** account; app on **HTTPS Route**; **Terraform + CI** (no manual deploy triggers); **lab on/off** via IaC and scripts.
 
-**Status:** In progress (planning documented; implementation follows phases below).
+**Status:** **In progress on `main`** — Phases 0–4 and 6 done; Phase 5 scripts shipped; **Phase 5 done gate** (lab-off → CI skip → lab-on → deploy) pending one test. Terraform ROSA cluster (Phase 1 Path B) deferred.
+
+---
+
+## What we shipped (on `main`)
+
+| Area | Delivered |
+|------|-----------|
+| **Cluster** | Manual **`gc-rosa-lab`** classic STS in **`eu-west-1`** (Path A); **`make lab-on`** / **`make lab-off`** (delete/recreate — no hibernate) |
+| **App** | **`k8s/base`** + **`k8s/overlays/rosa`**; Route; ECR image via kustomize + CI **`oc set image`** to **`github.sha`** |
+| **CI** | **`ci.yaml`** push ECR; **`deploy-rosa.yaml`** after CI (skips when lab off / bad **`ROSA_API_URL`**) |
+| **Ops** | **`docs/rosa/runbook.md`**; **`make lab-status`**, **`lab-ecr-refresh`**, **`lab-on`**, **`lab-off`** |
+| **Verify** | Public **`/readyz`**; Stripe Dashboard webhooks; structured **`oc logs`** |
+
+**Lessons (CI deploy):** **`ROSA_API_URL`** must be a GitHub **Variable** (not Secret), updated after each recreate, **no spaces**. Stripe: edit existing endpoint URL; **`whsec`** usually unchanged.
 
 ---
 
@@ -14,7 +28,7 @@
 | App deploy | **GitHub Actions** on **`push` to `main`** (after **`push-ecr`**) — not **`workflow_dispatch`** |
 | Manifests | Git **`k8s/`** + **`openshift/route.yaml`** applied by CI (**`oc`** or **`kubectl`**) |
 | Secrets | **GitHub Actions secrets** → cluster **`Secret`** at deploy time (no values in git). ECR pull via fresh **`docker-registry`** Secret each deploy (or CronJob stretch). |
-| Cost control | **`lab_enabled`** Terraform variable + **`rosa stop` / `rosa start`** wrappers; CI **skips deploy** when cluster is stopped (success, not failure) |
+| Cost control | **`make lab-off`** / **`make lab-on`** (delete/recreate); CI **skips deploy** when cluster off; Terraform **`lab_enabled`** deferred |
 | Image tag | CI sets Deployment image to **`${{ github.sha }}`** (remove hardcoded ECR URL from committed YAML over time — use kustomize, envsubst, or TF) |
 
 ---
@@ -189,10 +203,10 @@ Work **in this sequence**. Each phase has a **done gate** before the next.
 
 - [x] Phase 0: ROSA + AWS linked
 - [x] Phase 1: Cluster ready; **`oc get nodes`** (manual **`rosa create`** on Path A; Terraform deferred)
-- [ ] Phase 2: CI AWS/OIDC permissions documented
+- [x] Phase 2: GitHub Actions vars/secrets documented in **`docs/rosa/runbook.md`**; ECR/OIDC IAM from existing **`infra/terraform/`**
 - [x] Phase 3: **`k8s/base`** + **`k8s/overlays/rosa`**; **`oc apply -k`**; image via kustomize transformer
 - [x] Phase 4: **`.github/workflows/deploy-rosa.yaml`** - push **`main`** deploys when cluster ready (skips when lab off)
-- [ ] Phase 5: **`lab-on`** / **`lab-off`** + CI skip when stopped
+- [ ] Phase 5: **`lab-on`** / **`lab-off`** shipped; **done gate** pending: **`make lab-off`** → Deploy ROSA skips → **`make lab-on`** + setup → deploy succeeds
 - [x] Phase 6: Public **`/readyz`** + Stripe webhook + **`oc logs`** (manual verify on **`upgg`** cluster)
 
 ---

@@ -206,6 +206,8 @@ For a **remote** OpenShift experience without standing up AWS yourself, the [Red
 
 **Branch (suggested):** **`15-rosa-lab-deploy`** — see **[docs/branches/15-rosa-lab-deploy.md](docs/branches/15-rosa-lab-deploy.md)**.
 
+**Milestone 7 status:** **In progress on `main`**. Shipped: ROSA classic lab (**Path A** manual cluster), kustomize **`k8s/overlays/rosa`**, **`deploy-rosa.yaml`** (push **`main`** deploys **`github.sha`**; skips when lab off), **`make lab-status`** / **`lab-ecr-refresh`** / **`lab-on`** / **`lab-off`**, **[docs/rosa/runbook.md](docs/rosa/runbook.md)**. Verified: **`/readyz`**, Stripe Dashboard webhooks, structured logs, CI deploy to running cluster. **Remaining:** Phase 5 done gate (**`make lab-off`** → CI skip test); optional Terraform **`infra/terraform/rosa/`** deferred. **Next after M7:** **Milestone 8** (idempotency + RDS).
+
 ---
 
 ## Milestone 8: Idempotency

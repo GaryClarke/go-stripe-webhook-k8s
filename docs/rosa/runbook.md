@@ -60,19 +60,48 @@ When the cluster is **off**, **Deploy ROSA** on push to **`main`** **skips** (ex
 - **Trigger:** every **`push` to `main`** (after **`push-ecr`** in **`ci.yaml`**).
 - **Skips** (exit 0) when cluster is off, **`ROSA_API_URL`** unset, or **`oc login`** fails.
 - **Deploy steps:** sync **`ecr-registry`** + **`stripe-webhook-secret`**, **`oc apply -k k8s/overlays/rosa`**, **`oc set image`** to **`github.sha`**, smoke **`/readyz`**.
-- **GitHub:** variable **`ROSA_API_URL`**; secrets **`OC_LAB_PASSWORD`**, **`STRIPE_WEBHOOK_SECRET`**.
+- **GitHub:** see **GitHub Actions configuration** below.
 
 ---
 
-## GitHub Actions secrets (expected)
+## GitHub Actions configuration
 
 Set under repo **Settings → Secrets and variables → Actions**. **Never commit values.**
 
+**CI** (`ci.yaml`) uses **Variables** + OIDC for ECR push. **Deploy ROSA** (`deploy-rosa.yaml`) uses **Variables** + **Secrets** for `oc login` and cluster Secrets. We use **htpasswd + `ROSA_API_URL`** in CI (no Red Hat offline token).
+
+### Variables (Actions → **Variables**)
+
+| Variable | Purpose |
+|----------|---------|
+| **`AWS_ROLE_ARN`** | OIDC trust → IAM role for ECR push (from **`infra/terraform/`** output **`github_actions_role_arn`**) |
+| **`AWS_REGION`** | e.g. **`eu-west-1`** (optional in workflow; defaults to **`eu-west-1`**) |
+| **`ECR_REPOSITORY`** | e.g. **`go-stripe-webhook-k8s`** (optional; workflow default matches repo) |
+| **`ROSA_API_URL`** | Cluster API URL for CI **`oc login`** — copy from **`make lab-on`** or **`rosa describe cluster`**; **update after every delete/recreate**; must be a **Variable** (not a Secret); **no spaces** |
+
+Example **`ROSA_API_URL`** (suffix changes when cluster is recreated):
+
+```text
+https://api.gc-rosa-lab.upgg.p1.openshiftapps.com:6443
+```
+
+### Secrets (Actions → **Secrets**)
+
 | Secret | Purpose |
 |--------|---------|
-| *(existing vars)* **`AWS_ROLE_ARN`** | OIDC → AWS (ECR, optional TF) |
-| **`ROSA_TOKEN`** (or agreed name) | **`oc login`** / **`rosa`** API from CI |
-| **`STRIPE_WEBHOOK_SECRET`** | Dashboard signing secret for ROSA endpoint |
+| **`OC_LAB_PASSWORD`** | htpasswd password for user **`garyc`** (CI **`oc login`**) |
+| **`STRIPE_WEBHOOK_SECRET`** | Stripe Dashboard **`whsec_...`** for the ROSA webhook endpoint (not **`stripe listen`**) |
+
+### Common CI deploy mistakes
+
+| Mistake | Symptom |
+|---------|---------|
+| **`ROSA_API_URL` in Secrets** instead of Variables | Deploy skips: *ROSA_API_URL not set* |
+| Stale URL after **`make lab-off`** / recreate | Deploy skips: *oc login failed* or *no such host* |
+| Space in URL (e.g. after `.`) | *invalid character " " in host name* |
+| Cluster off | Deploy skips (expected); job stays green |
+
+**Done gate (Phase 2):** existing Terraform GitHub OIDC role pushes ECR; deploy workflow uses same OIDC for **`aws ecr get-login-password`** plus **`oc`** credentials above.
 
 ---
 
@@ -106,5 +135,5 @@ Update this table after first **`terraform apply`** / billing review.
 |---------|--------|
 | **`ImagePullBackOff`** | **`ecr-registry`** Secret; CI refresh on deploy |
 | Route **503** / app unavailable | **`oc get pods`** Ready; **`oc describe route`** |
-| CI deploy skipped | Cluster **stopped** — **`make lab-on`** |
+| CI deploy skipped | Cluster **off** — **`make lab-on`**; or fix **`ROSA_API_URL`** (Variable, no spaces, current API from **`make lab-on`**) |
 | Webhook **400** | **`stripe-webhook-secret`** matches **Dashboard** destination, not **`stripe listen`** |

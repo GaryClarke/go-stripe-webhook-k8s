@@ -29,7 +29,7 @@ Add a row when you open or complete a branch.
 | `12-k8s-first-deploy` | [12-k8s-first-deploy.md](12-k8s-first-deploy.md) | `k8s/`: Deployment + ClusterIP Service, ECR pull + Stripe Secrets via `kubectl`, port-forward probes |
 | `13-openshift-route` | [13-openshift-route.md](13-openshift-route.md) | **`openshift/route.yaml`** (portable **Route**, TLS edge); Sandbox runbook **`docs/openshift/`** |
 | `14-structured-logging` | [14-structured-logging.md](14-structured-logging.md) | **Milestone 6** (done): JSON **`slog`**, **`RequestLog`**, **`request_id`**, **`logmsg`** contract; optional polish in **PLAN** stretch |
-| `15-rosa-lab-deploy` | [15-rosa-lab-deploy.md](15-rosa-lab-deploy.md) | **Milestone 7** (in progress): **ROSA** Terraform + **GHA** deploy; lab on/off; phases 0–6 |
+| `15-rosa-lab-deploy` | [15-rosa-lab-deploy.md](15-rosa-lab-deploy.md) | **Milestone 7** (in progress on **`main`**): ROSA lab, kustomize, **GHA** deploy, **`lab-on`/`lab-off`**; Phase 5 test pending |
 
 **Doc template:** mirror the style in [original-branches](../original-branches/README.md): goal, scope, key files, how to verify, follow-ups.
 
