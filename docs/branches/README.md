@@ -30,6 +30,7 @@ Add a row when you open or complete a branch.
 | `13-openshift-route` | [13-openshift-route.md](13-openshift-route.md) | **`openshift/route.yaml`** (portable **Route**, TLS edge); Sandbox runbook **`docs/openshift/`** |
 | `14-structured-logging` | [14-structured-logging.md](14-structured-logging.md) | **Milestone 6** (done): JSON **`slog`**, **`RequestLog`**, **`request_id`**, **`logmsg`** contract; optional polish in **PLAN** stretch |
 | `15-rosa-lab-deploy` | [15-rosa-lab-deploy.md](15-rosa-lab-deploy.md) | **Milestone 7** (in progress on **`main`**): ROSA lab, kustomize, **GHA** deploy, **`lab-on`/`lab-off`**; Phase 5 test pending |
+| `16-idempotency-postgres` | [16-idempotency-postgres.md](16-idempotency-postgres.md) | **Milestone 8** (in progress): Postgres **`processed_events`**, insert-on-conflict, **`/readyz`** DB check, RDS, **`replicas: 2+`** |
 
 **Doc template:** mirror the style in [original-branches](../original-branches/README.md): goal, scope, key files, how to verify, follow-ups.
 

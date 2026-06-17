@@ -215,12 +215,16 @@ For a **remote** OpenShift experience without standing up AWS yourself, the [Red
 | | |
 |--|--|
 | **Learn** | Stripe retries; duplicate delivery; **`event.id`**; **shared state across replicas**; managed **Postgres** (Terraform **RDS** in same AWS account / VPC as ROSA). |
-| **Build** | **`processed_events`** with **`UNIQUE(event_id)`**; atomic **`INSERT … ON CONFLICT DO NOTHING`** (no check-then-insert); **`DATABASE_URL`** from env; local **Docker Compose** Postgres for dev; **RDS** for ROSA; **`replicas: 2+`** to prove cross-Pod dedupe; structured logs (**`stripe_event_duplicate_skipped`**, etc.); **`/readyz`** checks DB. |
-| **Done when** | Same **`event_id`** twice → **one** row in store, duplicate returns **204**, logs show skip on second delivery; works with **multiple Pods** on ROSA. |
+| **Build** | **Event ledger** **`processed_events`** (**`status`**: **`processing` / `processed` / `failed`**); atomic **`INSERT … ON CONFLICT DO NOTHING`** claim; single-TX process for M8; **[Goose](https://github.com/pressly/goose)** migrations; **`DATABASE_URL`** from env; local **Docker Compose** Postgres; **RDS** for ROSA; **`replicas: 2+`**; structured logs; **`/readyz`** checks DB. Branch doc: **[docs/branches/16-idempotency-postgres.md](docs/branches/16-idempotency-postgres.md)**. |
+| **Done when** | Same **`event_id`** twice → **one** ledger row (**`processed`**), duplicate returns **204**, logs show skip or in-flight; works with **multiple Pods** on ROSA. |
 
 In-memory dedupe is acceptable only as a **demonstration** with explicit “single replica only” caveats.
 
 **Store choice (locked):** **Postgres** (not Redis) for durable idempotency and audit.
+
+**Branch (suggested):** **`16-idempotency-postgres`** — see **[docs/branches/16-idempotency-postgres.md](docs/branches/16-idempotency-postgres.md)**.
+
+**Milestone 8 status:** **In progress** on branch **`16-idempotency-postgres`**. **`downstream/`** removed (separate repo). Locked: Postgres **ledger** + **Goose** + insert-first + single-TX M8 + **204** for **`processed`** and **`processing`** duplicates. Phases in branch doc.
 
 ---
 

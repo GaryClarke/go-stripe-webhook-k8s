@@ -5,7 +5,7 @@
 ## What we added
 
 - **`Dockerfile`**: static binary (**`CGO_ENABLED=0`**, **`-trimpath`**, **`-ldflags="-s -w"`**), **`TARGETOS` / `TARGETARCH`** (default **amd64**) for **BuildKit** / **`--platform`**, **`ENTRYPOINT ["/api"]`**, **`USER 65532`**, **`EXPOSE 8080`**.
-- **`.dockerignore`**: excludes **`.git`**, **docs**, **`downstream/`**, **`terraform/`**, tests, **`.env`**, IDE noise, etc.; keeps **`cmd/`**, **`internal/`**, **`go.mod`**, **`go.sum`** for **`go build ./cmd/api`**.
+- **`.dockerignore`**: excludes **`.git`**, **docs**, **`terraform/`**, tests, **`.env`**, IDE noise, etc.; keeps **`cmd/`**, **`internal/`**, **`go.mod`**, **`go.sum`** for **`go build ./cmd/api`**.
 - **`PLAN.md`**: Milestone 3 **Done when** split into **(1)** local container smoke **(2)** **GitHub Actions** build + push; note that **CI image job** may follow this commit.
 - **`README.md`**: Docker commands, **`.dockerignore`**, Apple Silicon **`--platform`**, accurate CI wording; layout rows for **`Dockerfile`** / **`.dockerignore`**.
 - **`go.mod`**: **`go 1.26.1`** (toolchain alignment).

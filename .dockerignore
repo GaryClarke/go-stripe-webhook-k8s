@@ -9,7 +9,6 @@ PLAN.md
 cursor-rules.md
 
 # Other trees in this learning repo (not imported by cmd/api)
-downstream/
 terraform/
 
 # Test fixtures and test sources (not required for go build ./cmd/api)
