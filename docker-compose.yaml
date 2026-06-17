@@ -1,0 +1,36 @@
+# Local PostgreSQL for M8 idempotency work (dev + integration tests).
+# RDS in AWS is separate — provisioned later via Terraform (Phase 9).
+#
+# Start:  docker compose up -d
+#         or: make db-up   (after Makefile targets land in snippet 3)
+#
+# Dev DB:  stripe_webhook_dev   (default DB, created automatically)
+# Test DB: stripe_webhook_test  (created by init script in snippet 2)
+
+services:
+    db:
+        image: postgres:16-alpine
+        container_name: stripe-webhook-postgres
+        environment:
+            # Superuser credentials for the container — local dev only, not production secrets.
+            POSTGRES_USER: webhook
+            POSTGRES_PASSWORD: webhook
+            # Default database created on first container start.
+            POSTGRES_DB: stripe_webhook_dev
+        ports:
+            # Host 5433 avoids clashing with a Postgres already running on 5432 (common on Mac).
+            - "5433:5432"
+        volumes:
+            # Persist data between restarts (migrations, dev rows survive `docker compose stop`).
+            - stripe_webhook_pgdata:/var/lib/postgresql/data
+            # SQL files here run once on first init (empty volume only) — snippet 2 adds the test DB.
+            - ./docker/postgres/init:/docker-entrypoint-initdb.d:ro
+        healthcheck:
+            # Compose marks the service healthy when Postgres accepts connections.
+            test: ["CMD-SHELL", "pg_isready -U webhook -d stripe_webhook_dev"]
+            interval: 3s
+            timeout: 5s
+            retries: 5
+
+volumes:
+    stripe_webhook_pgdata:
