@@ -18,7 +18,7 @@ make lab-status
 
 | Situation | Command |
 |-----------|---------|
-| **`rosa` token expired** | `rosa login --use-auth-code` |
+| **`rosa` token expired** | **`rosa login --use-auth-code`** (browser SSO) - see [Red Hat CLI login](#red-hat-cli-login-rosa) |
 | **`oc` not logged in** | `oc login https://api.gc-rosa-lab.upgg.p1.openshiftapps.com:6443 -u garyc -p '<password>'` then `oc project go-stripe-webhook` |
 | **`ImagePullBackOff`** | `make lab-ecr-refresh` (needs `aws` CLI) |
 | **Webhook 400 / new Stripe destination** | Update `stripe-webhook-secret` with Dashboard **`whsec`** (not `stripe listen`), then `oc rollout restart deployment/go-stripe-webhook-k8s` |
@@ -31,13 +31,54 @@ make lab-status
 
 ---
 
+## Red Hat CLI login (`rosa`)
+
+Use this when **`rosa list clusters`**, **`make lab-off`**, or **`make lab-on`** fail with token / authentication errors, or when **`make lab-status`** prints **`>>> YOU: Refresh Red Hat SSO`**.
+
+### Preferred: browser SSO (auth code)
+
+```bash
+rosa login --use-auth-code
+```
+
+1. CLI prints **`You will now be redirected to Red Hat SSO login`** and opens the browser (or shows a URL).
+2. Sign in with your Red Hat account in the browser.
+3. CLI prints **`Token received successfully`** and **`Logged in as '…' on 'https://api.openshift.com'`**.
+
+Verify:
+
+```bash
+rosa whoami
+rosa list clusters
+```
+
+**Why prefer this over `rosa login` (paste token):** No copying an offline access token from the console; fewer mistakes; same SSO session you use in the browser. **Do not paste tokens into chat** or commit them.
+
+### Plain `rosa login` (offline token)
+
+`rosa login` alone prompts for an **offline access token** from [console.redhat.com/openshift/token/rosa](https://console.redhat.com/openshift/token/rosa). Use only if **`--use-auth-code`** is unavailable (headless environment, browser blocked). Paste the token **only in your local terminal**.
+
+### Switch Red Hat account
+
+```bash
+rosa logout
+# Log out of https://sso.redhat.com in the browser if needed
+rosa login --use-auth-code
+```
+
+### CI does not use `rosa login`
+
+**Deploy ROSA** in GitHub Actions uses **`oc login`** with **`ROSA_API_URL`** + **`OC_LAB_PASSWORD`** (htpasswd). Local **`rosa login`** is for **`rosa`** / **`make lab-on`** / **`make lab-off`** only.
+
+---
+
 ## Lab on / lab off
 
 Hibernate / **`rosa stop`** is not available on this account. Use **delete / recreate** to stop billing.
 
 | When | Command |
 |------|---------|
-| **End of day** | `make lab-off` (deletes cluster; ~10-20 min uninstall) |
+| **End of day** | `make lab-off` (deletes cluster; ~10-20 min uninstall). Requires **`rosa login --use-auth-code`** first - script exits with instructions if not logged in. |
 | **Start of day** | `make lab-on` (creates cluster if missing, or prints status + checklist) |
 | **Cluster ready** | Follow checklist from `make lab-on` (GitHub **`ROSA_API_URL`**, Stripe URL, IDP/setup) |
 | **Working** | `make lab-status` |
