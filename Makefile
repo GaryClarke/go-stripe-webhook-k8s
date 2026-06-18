@@ -58,13 +58,11 @@ db-check:
 	docker compose ps
 	docker compose exec db psql -U webhook -d stripe_webhook_dev -c '\l'
 
-# Phase 2: Goose migrations (targets wired now; goose + migrations/ come next).
+# Goose runs SQL migrations in migrations/ (see docs/branches/16-idempotency-postgres.md).
+GOOSE := go tool goose
+
 db-migrate:
-	@echo "Phase 2: install goose and add migrations/ — then:"
-	@echo "  goose -dir migrations postgres \"$(DATABASE_URL_DEV)\" up"
-	@exit 1
+	$(GOOSE) -dir migrations postgres "$(DATABASE_URL_DEV)" up
 
 db-migrate-test:
-	@echo "Phase 2: install goose and add migrations/ — then:"
-	@echo "  goose -dir migrations postgres \"$(DATABASE_URL_TEST)\" up"
-	@exit 1
+	$(GOOSE) -dir migrations postgres "$(DATABASE_URL_TEST)" up
