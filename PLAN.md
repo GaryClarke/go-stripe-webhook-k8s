@@ -268,6 +268,40 @@ You do not need a full cluster-distributed Kafka on day one; pick one local stor
 
 ---
 
+## Types and package boundaries
+
+This table is the **current** map of main structs and interfaces. **Lambda-era** types in **`internal/engine`** remain for **M9** queue work; they are **not** on the live webhook path after **Milestone 2**.
+
+| Name | Package | Production use | Role |
+|------|---------|----------------|------|
+| **`stripe.Event`** | `github.com/stripe/stripe-go/v85` | **Yes** (`cmd/api/handlers.go`) | Verified webhook at the HTTP edge after **`stripe.ConstructEvent`** |
+| **`store.Store`** | `internal/store` | **M8+** | Idempotency ledger (**`ProcessEvent`**, **`Status`**, **`Ping`**) |
+| **`store.EventStatus`** | `internal/store` | **M8+** | Result of **`Status`** lookup (`Found`, ledger **`status`**) |
+| **`config.Config`** | `internal/config` | **Yes** | Env-based app config |
+| **`App`** | `cmd/api` | **Yes** | HTTP server wiring (routes, handlers, deps) |
+| **`engine.StripeEvent`** | `internal/engine` | **No** (tests / legacy) | Pre-**M2** JSON parse model; superseded at ingest by **`stripe.Event`** |
+| **`engine.Job`** | `internal/engine` | **No** (tests / planned) | Internal queue envelope for **M9** (Kafka / worker) |
+| **`ParseStripeEvent`** | `internal/engine` | **No** on HTTP path | Legacy **`json.Unmarshal`** helper; stub era (**branch 4**) |
+
+**Evolution (webhook ingest):**
+
+```text
+M1 stub (branch 4)   engine.ParseStripeEvent → engine.StripeEvent
+M2 verify (branch 8) stripe.ConstructEvent → stripe.Event  (locked)
+M8 idempotency       store.ProcessEvent(eventID, eventType, fn)  — not Stripe types
+M9 (planned)         Map stripe.Event → engine.Job (or outbox row) — decide in branch doc
+```
+
+**Layering rules (locked for M8):**
+
+- **`cmd/api`** maps **`stripe.Event`** → store primitives (**`ev.ID`**, **`string(ev.Type)`**).
+- **`internal/store`** takes **`eventID`** and **`eventType`** strings (or a small **`store`**-local struct later), **not** **`stripe.Event`** or **`engine.StripeEvent`** — persistence must not depend on Stripe SDK or domain queue types.
+- **`internal/engine`** is **not** removed yet; revisit when **M9** defines **`Job`** mapping and whether **`ParseStripeEvent`** / **`StripeEvent`** stay or shrink to tests-only removal.
+
+Historical detail: **`docs/original-branches/05-domain-types.md`**, **`09-parse-stripe-event.md`**, **`docs/branches/04-webhook-stripe-stub.md`**. Post-**M2**: **`docs/branches/08-stripe-webhook-verify.md`**, **`PLAN`** Milestone 2.
+
+---
+
 ## Decisions
 
 Record short, dated bullets as you go (examples below).
@@ -289,6 +323,7 @@ Record short, dated bullets as you go (examples below).
 - **2026-05-27** - **Prod-like deploy target:** **ROSA** + **Route** in learner **AWS** account (**Phase C**). **OpenShift Sandbox** (**Phase B**) is frozen after **M5**; not the foundation for **M7+**.
 - **2026-05-27** - **Milestone renumber:** **M7** = **ROSA lab deploy** + cost on/off; **M8** = **idempotency** + **RDS Postgres**; **M9** = **Kafka**. **EKS** is not the primary path.
 - **2026-05-27** - **M7 automation:** **Terraform** in **`infra/terraform/rosa/`**; **GHA deploy on `push` to `main`** (no **`workflow_dispatch`**); **GH secrets** for Stripe/ROSA at deploy; CI **skips** when lab stopped; **`lab_enabled`** + **`rosa stop`/`start`** scripts.
+- **2026-06-18** - **M8 store boundary:** **`store.Store.ProcessEvent`** takes **`eventID`** and **`eventType`** strings (not **`stripe.Event`** or **`engine.StripeEvent`**). Handler maps from **`ConstructEvent`** after verify. **`store.EventStatus`** for duplicate / in-flight lookups. See [Types and package boundaries](#types-and-package-boundaries).
 
 ## Open questions
 

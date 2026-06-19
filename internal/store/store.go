@@ -9,6 +9,12 @@ const (
 	StatusFailed     = "failed"
 )
 
+// EventStatus is the ledger summary for one Stripe event.id.
+type EventStatus struct {
+	Status string // processing | processed | failed
+	Found  bool   // false when no row exists for event_id
+}
+
 // Store persists webhook idempotency state in Postgres.
 // Implementations must be safe for concurrent use across multiple Pods.
 type Store interface {
@@ -17,8 +23,8 @@ type Store interface {
 	// Returns claimed=false when eventID already exists (use Status for logging).
 	ProcessEvent(ctx context.Context, eventID, eventType string, fn func(ctx context.Context) error) (claimed bool, err error)
 
-	// Status returns the current status when eventID exists.
-	Status(ctx context.Context, eventID string) (status string, found bool, err error)
+	// Status returns ledger state for eventID. Found=false when no row exists.
+	Status(ctx context.Context, eventID string) (*EventStatus, error)
 
 	// Ping checks database connectivity (for /readyz).
 	Ping(ctx context.Context) error
