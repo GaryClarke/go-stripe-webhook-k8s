@@ -19,15 +19,22 @@ Legacy Lambda and Terraform artefacts may remain in the tree during the transiti
 
 ## Local development
 
-### Milestone 1 (HTTP server)
-
-When `cmd/api` exists, the intended flow is:
+### HTTP server (`cmd/api`)
 
 ```bash
 go mod tidy
-cp .env.example .env   # edit .env: STRIPE_WEBHOOK_SECRET is required for cmd/api
+make db-up db-migrate          # Milestone 8: local Postgres on port 5433
+cp .env.example .env           # set STRIPE_WEBHOOK_SECRET and DATABASE_URL
 go run ./cmd/api
 ```
+
+**`.env` (required):**
+
+| Variable | Purpose |
+|----------|---------|
+| **`STRIPE_WEBHOOK_SECRET`** | Stripe webhook signing secret (`whsec_...` from Dashboard or **`stripe listen`**) |
+| **`DATABASE_URL`** | Postgres DSN — use **`make db-up`** dev URL, e.g. `postgres://webhook:webhook@localhost:5433/stripe_webhook_dev?sslmode=disable` (see **`DATABASE_URL_DEV`** in **`Makefile`**) |
+| **`PORT`** | Optional listen port (default **`8080`**) |
 
 Optional **debug dumps** (**`internal/dbg.DD`**, **`spew`** + exit): **`go run -tags debug ./cmd/api`** or **`go test -tags debug ./...`** (see [PLAN.md](PLAN.md) Milestone 1).
 
@@ -37,7 +44,7 @@ Verify liveness:
 curl -sS http://localhost:8080/livez
 ```
 
-Use the port from your config (default `8080` once wired). See [PLAN.md](PLAN.md) Milestone 1 for the full “done when” checklist.
+Signed webhooks persist idempotency state in **`processed_events`** when Postgres is up. See [docs/branches/16-idempotency-postgres.md](docs/branches/16-idempotency-postgres.md) for the full M8 flow.
 
 Historical Lambda / queue notes from the parent project live in [docs/PROJECT_KNOWLEDGE.md](docs/PROJECT_KNOWLEDGE.md).
 
@@ -56,7 +63,10 @@ From the repo root (see **`.dockerignore`** for what enters the build context):
 docker build -t go-stripe-webhook-k8s .
 docker run --rm -p 8080:8080 --env-file .env go-stripe-webhook-k8s
 # or without a file, for a quick check:
-# docker run --rm -p 8080:8080 -e STRIPE_WEBHOOK_SECRET=whsec_test go-stripe-webhook-k8s
+# docker run --rm -p 8080:8080 \
+#   -e STRIPE_WEBHOOK_SECRET=whsec_test \
+#   -e DATABASE_URL=postgres://webhook:webhook@host.docker.internal:5433/stripe_webhook_dev?sslmode=disable \
+#   go-stripe-webhook-k8s
 ```
 
 Adjust image name, port, and env file path to match your setup. On **Apple Silicon**, use **`docker build --platform linux/arm64 ...`** if you want a native **arm64** image (the **`Dockerfile`** uses **`TARGETARCH`**).

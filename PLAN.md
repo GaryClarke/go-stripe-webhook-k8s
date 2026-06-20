@@ -224,7 +224,7 @@ In-memory dedupe is acceptable only as a **demonstration** with explicit “sing
 
 **Branch (suggested):** **`16-idempotency-postgres`** — see **[docs/branches/16-idempotency-postgres.md](docs/branches/16-idempotency-postgres.md)**.
 
-**Milestone 8 status:** **In progress** on branch **`16-idempotency-postgres`**. **`downstream/`** removed (separate repo). Locked: Postgres **ledger** + **Goose** + insert-first + single-TX M8 + **204** for **`processed`** and **`processing`** duplicates. Phases in branch doc.
+**Milestone 8 status:** **In progress** on branch **`16-idempotency-postgres`**. **Phases 1–5 shipped:** Compose, Goose, **`internal/store`**, webhook **`ProcessEvent`** wiring, **`DATABASE_URL`** in **`config.Load`**. **`downstream/`** removed (separate repo). **Next:** duplicate integration tests (Phase 6), **`/readyz`** DB ping, K8s/RDS. See **[docs/branches/16-idempotency-postgres.md](docs/branches/16-idempotency-postgres.md)**.
 
 ---
 
