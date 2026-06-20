@@ -15,7 +15,8 @@ const defaultPort = "8080"
 type Config struct {
 	StripeWebhookSecret string
 	// Port is the listen port without a leading colon (e.g. "8080"). Use ":"+cfg.Port for http.Server.Addr.
-	Port string
+	DatabaseURL string
+	Port        string
 }
 
 // Load reads configuration from the environment.
@@ -33,8 +34,13 @@ func Load() (*Config, error) {
 		return nil, errors.New("config: STRIPE_WEBHOOK_SECRET is required")
 	}
 
+	databaseURL := strings.TrimSpace(os.Getenv("DATABASE_URL"))
+	if databaseURL == "" {
+		return nil, errors.New("config: DATABASE_URL is required")
+	}
 	return &Config{
 		StripeWebhookSecret: stripeWebhookSecret,
+		DatabaseURL:         databaseURL,
 		Port:                port,
 	}, nil
 }

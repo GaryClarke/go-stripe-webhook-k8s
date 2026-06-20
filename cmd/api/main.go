@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"integration-engine/internal/store"
 	"net/http"
 	"os"
 	"os/signal"
@@ -19,7 +20,12 @@ func main() {
 		logger.Error(msgConfigLoadFailed, "error", err.Error())
 		os.Exit(1)
 	}
-	app := NewApp(cfg, logger)
+	st, err := store.NewPostgres(cfg.DatabaseURL)
+	if err != nil {
+		logger.Error(msgStoreInitFailed, "error", err.Error())
+		os.Exit(1)
+	}
+	app := NewApp(cfg, logger, st)
 
 	addr := ":" + cfg.Port
 	handler := Recover(logger, RequestLog(logger, app.routes()))

@@ -1,12 +1,15 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
 
 	"github.com/stripe/stripe-go/v85"
+
+	"integration-engine/internal/store"
 )
 
 // healthResponse is used for probe-style JSON bodies (livez, readyz).
@@ -73,11 +76,56 @@ func (app *App) handleStripeWebhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Info(msgStripeEventAccepted,
-		"event_id", ev.ID,
-		"event_type", string(ev.Type),
-		"body_bytes", len(body),
-	)
+	claimed, err := app.store.ProcessEvent(r.Context(), ev.ID, string(ev.Type), func(ctx context.Context) error {
+		log.Info(msgStripeEventAccepted,
+			"event_id", ev.ID,
+			"event_type", string(ev.Type),
+			"body_bytes", len(body),
+		)
+		return nil
+	})
+	if err != nil {
+		log.Error(msgStripeEventProcessFailed,
+			"event_id", ev.ID,
+			"event_type", string(ev.Type),
+			"error", err.Error(),
+		)
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
+	if claimed {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
 
+	es, err := app.store.Status(r.Context(), ev.ID)
+	if err != nil {
+		log.Error(msgStripeEventProcessFailed,
+			"event_id", ev.ID,
+			"event_type", string(ev.Type),
+			"error", err.Error(),
+		)
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
+
+	switch es.Status {
+	case store.StatusProcessed:
+		log.Info(msgStripeEventDuplicateSkipped,
+			"event_id", ev.ID,
+			"event_type", string(ev.Type),
+		)
+	case store.StatusProcessing:
+		log.Info(msgStripeEventAlreadyProcessing,
+			"event_id", ev.ID,
+			"event_type", string(ev.Type),
+		)
+	default:
+		log.Info(msgStripeEventDuplicateSkipped,
+			"event_id", ev.ID,
+			"event_type", string(ev.Type),
+			"status", es.Status,
+		)
+	}
 	w.WriteHeader(http.StatusNoContent)
 }

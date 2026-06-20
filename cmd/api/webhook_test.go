@@ -2,18 +2,59 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/stripe/stripe-go/v85"
 
 	"integration-engine/internal/config"
+	"integration-engine/internal/store"
 )
 
 const testWebhookSecret = "whsec_test"
+
+type fakeStore struct {
+	mu   sync.Mutex
+	rows map[string]string
+}
+
+func newFakeStore() *fakeStore {
+	return &fakeStore{rows: make(map[string]string)}
+}
+
+func (f *fakeStore) ProcessEvent(ctx context.Context, eventID, eventType string, fn func(context.Context) error) (bool, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if _, ok := f.rows[eventID]; ok {
+		return false, nil
+	}
+	f.rows[eventID] = store.StatusProcessing
+	if err := fn(ctx); err != nil {
+		f.rows[eventID] = store.StatusFailed
+		return false, err
+	}
+	f.rows[eventID] = store.StatusProcessed
+	return true, nil
+}
+
+func (f *fakeStore) Status(ctx context.Context, eventID string) (*store.EventStatus, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	s, ok := f.rows[eventID]
+	if !ok {
+		return &store.EventStatus{Found: false}, nil
+	}
+	return &store.EventStatus{Found: true, Status: s}, nil
+}
+
+func (f *fakeStore) Ping(ctx context.Context) error {
+	return nil
+}
 
 // apiHandler matches main: Recover(RequestLog(routes)).
 func apiHandler() http.Handler {
@@ -23,7 +64,7 @@ func apiHandler() http.Handler {
 		StripeWebhookSecret: testWebhookSecret,
 		Port:                "8080",
 	},
-		logger,
+		logger, newFakeStore(),
 	)
 	return Recover(logger, RequestLog(logger, app.routes()))
 }

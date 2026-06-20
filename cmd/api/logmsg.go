@@ -13,8 +13,13 @@ const (
 	msgPanic            = "panic"
 
 	msgConfigLoadFailed    = "config_load_failed"
+	msgStoreInitFailed     = "store_init_failed"
 	msgServerListening     = "server_listening"
 	msgServerListenError   = "server_listen_error"
 	msgShuttingDown        = "shutting_down"
 	msgServerShutdownError = "server_shutdown_error"
+
+	msgStripeEventDuplicateSkipped  = "stripe_event_duplicate_skipped"
+	msgStripeEventAlreadyProcessing = "stripe_event_already_processing"
+	msgStripeEventProcessFailed     = "stripe_event_process_failed"
 )
