@@ -1,7 +1,7 @@
 # Deploy to ROSA after CI pushes a new image to ECR.
 # Skips gracefully when the lab cluster is off (deleted / not ready).
 #
-# Prerequisites: GitHub secrets OC_LAB_PASSWORD, STRIPE_WEBHOOK_SECRET
+# Prerequisites: GitHub secrets OC_LAB_PASSWORD, STRIPE_WEBHOOK_SECRET, DATABASE_URL
 # Variables: AWS_ROLE_ARN, AWS_REGION, ECR_REPOSITORY, ROSA_API_URL
 name: Deploy ROSA
 
@@ -68,6 +68,7 @@ jobs:
                   AWS_REGION: ${{ vars.AWS_REGION || 'eu-west-1' }}
                   ECR_REGISTRY: 234290944523.dkr.ecr.${{ vars.AWS_REGION || 'eu-west-1' }}.amazonaws.com
                   STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
+                  DATABASE_URL: ${{ secrets.DATABASE_URL }}
               run: |
                   oc create secret docker-registry ecr-registry \
                     --docker-server="$ECR_REGISTRY" \
@@ -78,6 +79,21 @@ jobs:
                   oc create secret generic stripe-webhook-secret \
                     --from-literal=STRIPE_WEBHOOK_SECRET="$STRIPE_WEBHOOK_SECRET" \
                     --dry-run=client -o yaml | oc apply -f -
+                  
+                  oc create secret generic database-url \
+                    --from-literal=DATABASE_URL="$DATABASE_URL" \
+                    --dry-run=client -o yaml | oc apply -f -
+
+            - uses: actions/setup-go@v5
+              if: steps.oc.outputs.skip != 'true'
+              with:
+                  go-version: "1.26"
+
+            - name: Run database migrations
+              if: steps.oc.outputs.skip != 'true'
+              env:
+                  DATABASE_URL: ${{ secrets.DATABASE_URL }}
+              run: go tool goose -dir migrations postgres "$DATABASE_URL" up
 
             - name: Apply manifests and roll out image
               if: steps.oc.outputs.skip != 'true'

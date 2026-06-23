@@ -38,6 +38,11 @@ spec:
                 secretKeyRef:
                   name: stripe-webhook-secret
                   key: STRIPE_WEBHOOK_SECRET
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: database-url
+                  key: DATABASE_URL
           readinessProbe:
             httpGet:
               path: /readyz

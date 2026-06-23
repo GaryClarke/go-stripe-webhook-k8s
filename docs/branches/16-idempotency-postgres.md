@@ -4,7 +4,7 @@
 
 **Git branch:** `16-idempotency-postgres`
 
-**Status:** **In progress** — Phases **1–5** shipped (Compose, Goose, **`internal/store`**, webhook wired with fake-store unit tests). **`downstream/`** removed (admin SPA lives in its own repo). Next: Phase **6** (duplicate integration tests), then **`/readyz`** + K8s **`DATABASE_URL`**.
+**Status:** **In progress** — Phases **1–8** shipped on branch (app + local Postgres + integration tests + **`/readyz`** ping + K8s **`DATABASE_URL`** + deploy **`goose up`**). **Phase 8 cluster done gate** pending **Phase 9** (RDS + GitHub **`DATABASE_URL`** secret). Next: **Phase 9–10**.
 
 **Prerequisite:** **Milestone 7** mostly shipped on **`main`** (ROSA deploy, CI, lab scripts). **M7 Phase 5 done gate** can close in parallel — does **not** block local M8 work (Phases 0–7).
 
@@ -245,11 +245,11 @@ Work **in this sequence**. Each phase has a **done gate** before the next.
 **Do:**
 
 1. ~~**`config.Load`:** require **`DATABASE_URL`**.~~ **Done in Phase 5** (local + **`go run`**).
-2. **`k8s/base/deployment.yaml`:** env from Secret **`database-url`**.
-3. **`deploy-rosa.yaml`:** sync secret from GitHub (match **`stripe-webhook-secret`** pattern).
-4. Run Goose migrations against RDS/DB before or during deploy (document approach).
+2. ~~**`k8s/base/deployment.yaml`:** env from Secret **`database-url`**.~~ **Shipped.**
+3. ~~**`deploy-rosa.yaml`:** sync secret from GitHub (match **`stripe-webhook-secret`** pattern).~~ **Shipped.**
+4. ~~Run Goose migrations against RDS/DB before or during deploy.~~ **Shipped:** **`go tool goose … up`** in **`deploy-rosa.yaml`** after secret sync, before rollout (requires reachable **`DATABASE_URL`** — Phase 9).
 
-**Done gate:** Pod **Ready** on cluster; webhook persists events.
+**Done gate:** Pod **Ready** on cluster; webhook persists events. *(Needs Phase 9 RDS + GitHub **`DATABASE_URL`**.)*
 
 ---
 
@@ -290,13 +290,13 @@ Work **in this sequence**. Each phase has a **done gate** before the next.
 
 | Existing | New / changed |
 |----------|----------------|
-| **`cmd/api/handlers.go`** | **Shipped:** ledger in webhook; **pending:** **`/readyz`** ping (Phase 7) |
+| **`cmd/api/handlers.go`** | **Shipped:** ledger in webhook + **`/readyz`** **`store.Ping`** |
 | **`cmd/api/app.go`**, **`main.go`** | **Shipped:** inject **`store.Store`** |
 | **`internal/config/config.go`** | **Shipped:** **`DATABASE_URL`** required |
-| **`cmd/api/logmsg.go`** | **Shipped:** idempotency + **`store_init_failed`** **`msg`** constants |
-| **`k8s/base/deployment.yaml`** | **Pending:** **`DATABASE_URL`** env (Phase 8) |
-| **`k8s/overlays/rosa`** | **Pending:** **`replicas: 2`**, RDS secret (Phases 9–10) |
-| **`.github/workflows/deploy-rosa.yaml`** | **Pending:** **`database-url`** secret (Phase 8) |
+| **`cmd/api/logmsg.go`** | **Shipped:** idempotency + **`store_init_failed`** + **`readyz_db_check_failed`** |
+| **`k8s/base/deployment.yaml`** | **Shipped:** **`DATABASE_URL`** from **`database-url`** Secret |
+| **`k8s/overlays/rosa`** | **Pending:** **`replicas: 2`** (Phase 10); RDS DSN via secret (Phase 9) |
+| **`.github/workflows/deploy-rosa.yaml`** | **Shipped:** **`database-url`** secret + **`goose up`** before rollout |
 | | **`docker-compose.yaml`** — **shipped** |
 | | **`migrations/`** + Goose — **shipped** |
 | | **`internal/store/`** — **shipped** |
@@ -312,9 +312,9 @@ Work **in this sequence**. Each phase has a **done gate** before the next.
 - [x] Phase 3: Store interface + unit fakes
 - [x] Phase 4: TX claim + **`processed`** integration test
 - [x] Phase 5: Webhook wired — **204** for processed + processing duplicates (unit tests; duplicate integration → Phase 6)
-- [ ] Phase 6: Integration duplicate delivery
-- [ ] Phase 7: **`/readyz`** DB check
-- [ ] Phase 8: K8s **`DATABASE_URL`**
+- [x] Phase 6: Integration duplicate delivery (+ concurrent bonus test)
+- [x] Phase 7: **`/readyz`** DB check
+- [x] Phase 8: K8s **`DATABASE_URL`** + deploy **`goose up`** (cluster verify → Phase 9)
 - [ ] Phase 9: RDS on ROSA
 - [ ] Phase 10: **`replicas: 2+`** cross-Pod dedupe
 

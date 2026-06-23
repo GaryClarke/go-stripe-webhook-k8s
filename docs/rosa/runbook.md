@@ -27,7 +27,7 @@ make lab-status
 
 **Health URL:** `https://go-stripe-webhook-k8s-go-stripe-webhook.apps.gc-rosa-lab.upgg.p1.openshiftapps.com/readyz` (DNS suffix changes after cluster recreate - use `oc get route` or `rosa describe cluster` for the current host).
 
-**Deploy (manual):** `oc apply -k k8s/overlays/rosa` (after `ecr-registry` and `stripe-webhook-secret` exist in project `go-stripe-webhook`).
+**Deploy (manual):** `oc apply -k k8s/overlays/rosa` (after `ecr-registry`, `stripe-webhook-secret`, and `database-url` exist in project `go-stripe-webhook`).
 
 ---
 
@@ -100,7 +100,7 @@ When the cluster is **off**, **Deploy ROSA** on push to **`main`** **skips** (ex
 - **Workflow:** **`.github/workflows/deploy-rosa.yaml`** runs after **`CI`** succeeds on **`main`**.
 - **Trigger:** every **`push` to `main`** (after **`push-ecr`** in **`ci.yaml`**).
 - **Skips** (exit 0) when cluster is off, **`ROSA_API_URL`** unset, or **`oc login`** fails.
-- **Deploy steps:** sync **`ecr-registry`** + **`stripe-webhook-secret`**, **`oc apply -k k8s/overlays/rosa`**, **`oc set image`** to **`github.sha`**, smoke **`/readyz`**.
+- **Deploy steps:** sync **`ecr-registry`** + **`stripe-webhook-secret`** + **`database-url`**, **`go tool goose … up`**, **`oc apply -k k8s/overlays/rosa`**, **`oc set image`** to **`github.sha`**, smoke **`/readyz`**.
 - **GitHub:** see **GitHub Actions configuration** below.
 
 ---
@@ -132,6 +132,7 @@ https://api.gc-rosa-lab.upgg.p1.openshiftapps.com:6443
 |--------|---------|
 | **`OC_LAB_PASSWORD`** | htpasswd password for user **`garyc`** (CI **`oc login`**) |
 | **`STRIPE_WEBHOOK_SECRET`** | Stripe Dashboard **`whsec_...`** for the ROSA webhook endpoint (not **`stripe listen`**) |
+| **`DATABASE_URL`** | Postgres DSN for idempotency ledger (Phase 9 RDS URL; synced to **`database-url`** Secret) |
 
 ### Common CI deploy mistakes
 
