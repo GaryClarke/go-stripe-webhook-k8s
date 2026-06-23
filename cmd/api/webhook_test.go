@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -56,25 +57,35 @@ func (f *fakeStore) Ping(ctx context.Context) error {
 	return nil
 }
 
-// apiHandler matches main: Recover(RequestLog(routes)).
-func apiHandler() http.Handler {
+// newAPIHandler wires the same stack as main but lets tests inject the store
+// and capture JSON logs from the buffer.
+func newAPIHandler(st store.Store) (http.Handler, *bytes.Buffer) {
 	var buf bytes.Buffer
 	logger := NewJSONLogger(&buf, nil)
 	app := NewApp(&config.Config{
 		StripeWebhookSecret: testWebhookSecret,
 		Port:                "8080",
-	},
-		logger, newFakeStore(),
+	}, logger, st)
+	return Recover(logger, RequestLog(logger, app.routes())), &buf
+}
+
+// apiHandler matches main for unit tests (fake store, logs discarded).
+func apiHandler() http.Handler {
+	h, _ := newAPIHandler(newFakeStore())
+	return h
+}
+
+func webhookJSON(eventID string) string {
+	return fmt.Sprintf(
+		`{"id":%q,"type":"invoice.payment_succeeded","object":"event","api_version":%q}`,
+		eventID,
+		stripe.APIVersion,
 	)
-	return Recover(logger, RequestLog(logger, app.routes()))
 }
 
 // validStripeWebhookJSON is JSON ConstructEvent accepts for testWebhookSecret when paired with a valid Stripe-Signature.
 func validStripeWebhookJSON() string {
-	return fmt.Sprintf(
-		`{"id":"evt_test_123","type":"invoice.payment_succeeded","object":"event","api_version":%q}`,
-		stripe.APIVersion,
-	)
+	return webhookJSON("evt_test_123")
 }
 
 // newSignedStripeWebhookRequest builds a POST /webhooks/stripe request with a valid
@@ -88,6 +99,33 @@ func newSignedStripeWebhookRequest(body string) *http.Request {
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Stripe-Signature", p.Header)
 	return req
+}
+
+func logMsgs(buf *bytes.Buffer) []string {
+	var msgs []string
+	for _, line := range strings.Split(buf.String(), "\n") {
+		if line == "" {
+			continue
+		}
+		var fields map[string]any
+		if err := json.Unmarshal([]byte(line), &fields); err != nil {
+			continue
+		}
+		if msg, ok := fields["msg"].(string); ok {
+			msgs = append(msgs, msg)
+		}
+	}
+	return msgs
+}
+
+func countMsg(msgs []string, want string) int {
+	n := 0
+	for _, m := range msgs {
+		if m == want {
+			n++
+		}
+	}
+	return n
 }
 
 func TestAPI_StripeWebhook_ValidJSON_NoContent(t *testing.T) {

@@ -113,6 +113,12 @@ func (p *Postgres) ProcessEvent(
 	return true, nil
 }
 
+// TruncateLedger removes all rows from processed_events (integration tests).
+func (p *Postgres) TruncateLedger(ctx context.Context) error {
+	_, err := p.db.ExecContext(ctx, `TRUNCATE TABLE processed_events`)
+	return err
+}
+
 // Compile-time check: *Postgres must implement Store.
 // If ProcessEvent or Status are missing, the build fails here.
 var _ Store = (*Postgres)(nil)
