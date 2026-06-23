@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -22,6 +23,14 @@ const testWebhookSecret = "whsec_test"
 type fakeStore struct {
 	mu   sync.Mutex
 	rows map[string]string
+}
+
+type pingFailStore struct {
+	fakeStore
+}
+
+func (f *pingFailStore) Ping(ctx context.Context) error {
+	return errors.New("db unreachable")
 }
 
 func newFakeStore() *fakeStore {
@@ -223,5 +232,18 @@ func TestAPI_Readyz(t *testing.T) {
 	}
 	if ct := rec.Header().Get("Content-Type"); ct != "application/json; charset=utf-8" {
 		t.Fatalf("Content-Type = %q", ct)
+	}
+}
+
+func TestAPI_Readyz_DBDown_ServiceUnavailable(t *testing.T) {
+	t.Parallel()
+
+	req := httptest.NewRequest(http.MethodGet, "/readyz", nil)
+	rec := httptest.NewRecorder()
+	h, _ := newAPIHandler(&pingFailStore{})
+	h.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusServiceUnavailable {
+		t.Fatalf("GET /readyz: status = %d, want %d", rec.Code, http.StatusServiceUnavailable)
 	}
 }

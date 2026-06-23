@@ -32,6 +32,16 @@ func (app *App) handleLivez(w http.ResponseWriter, r *http.Request) {
 func (app *App) handleReadyz(w http.ResponseWriter, r *http.Request) {
 	log := loggerFromContext(r.Context(), app.logger)
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+
+	// DB readiness check
+	if err := app.store.Ping(r.Context()); err != nil {
+		log.Error(msgReadyzDBCheckFailed,
+			"error", err.Error(),
+		)
+		http.Error(w, http.StatusText(http.StatusServiceUnavailable), http.StatusServiceUnavailable)
+		return
+	}
+
 	resp := healthResponse{Status: "ok"}
 	if err := json.NewEncoder(w).Encode(resp); err != nil {
 		log.Error(msgProbeEncodeError,
