@@ -29,3 +29,39 @@ variable "rds_secondary_subnet_az" {
   type        = string
   default     = "eu-west-1b"
 }
+
+variable "db_identifier" {
+  description = "RDS instance identifier (AWS console name)."
+  type        = string
+  default     = "go-stripe-webhook-rds"
+}
+
+variable "db_name" {
+  description = "Initial database name (Goose migrations target this DB)."
+  type        = string
+  default     = "stripe_webhook"
+}
+
+variable "db_username" {
+  description = "Master username for the RDS instance."
+  type        = string
+  default     = "webhook"
+}
+
+variable "db_master_password" {
+  description = "Master password — set in local terraform.tfvars only; never commit."
+  type        = string
+  sensitive   = true
+}
+
+variable "db_instance_class" {
+  description = "RDS instance size (lab: db.t4g.micro)."
+  type        = string
+  default     = "db.t4g.micro"
+}
+
+variable "db_allocated_storage_gb" {
+  description = "Initial storage in GB."
+  type        = number
+  default     = 20
+}

@@ -261,6 +261,8 @@ Work **in this sequence**. Each phase has a **done gate** before the next.
 2. Networking: ROSA workers → RDS.
 3. **`DATABASE_URL`** via GitHub Secret — never in git.
 
+**Lab (Phase 9 ship path):** RDS master password in **gitignored `terraform.tfvars`** (or **`TF_VAR_db_master_password`**); after **`terraform apply`**, copy **`terraform output -raw database_url`** into GitHub **`DATABASE_URL`**. Same pattern as M7 GH secrets → cluster **`database-url`** at deploy — manual handoff for a solo operator.
+
 **Done gate:** **`processed_events`** rows on RDS from live webhook.
 
 ---
@@ -282,6 +284,7 @@ Work **in this sequence**. Each phase has a **done gate** before the next.
 - **Stale `processing` reclaim** / **`failed`** retry workflows (schema ready; logic later)
 - **Redis** cache
 - **External Secrets Operator** (stretch)
+- **AWS Secrets Manager for RDS credentials** (stretch — see **Follow-ups**)
 - **Downstream admin SPA** (separate repo)
 
 ---
@@ -322,5 +325,6 @@ Work **in this sequence**. Each phase has a **done gate** before the next.
 
 ## Follow-ups
 
+- **Stretch — RDS secrets via AWS Secrets Manager:** Replace gitignored **`db_master_password`** / manual **`terraform output`** handoff with a team-realistic flow: **`random_password`** or **`manage_master_user_password`** → store DSN in **Secrets Manager**; CI **`terraform apply`** reads/writes via IAM; deploy syncs from SM (or **External Secrets Operator** → cluster **`database-url`**) instead of a human copying into GitHub. Aligns with **PLAN.md** OpenShift deploy stretch.
 - **Milestone 9:** Kafka — direct publish vs **outbox** (Barclays-shaped durability).
 - **M7 close-out:** **`make lab-off`** → CI skip → **`make lab-on`** → deploy — mark M7 complete in **PLAN.md**.
