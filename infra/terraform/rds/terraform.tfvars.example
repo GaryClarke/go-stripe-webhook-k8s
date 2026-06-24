@@ -1,0 +1,2 @@
+rosa_vpc_id             = "vpc-REPLACE_ME"
+rosa_private_subnet_ids = ["subnet-REPLACE_ME"]

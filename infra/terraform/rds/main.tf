@@ -8,3 +8,11 @@
 #
 # Do not add ECR or GitHub OIDC here — those live in infra/terraform/.
 # -----------------------------------------------------------------------------
+data "aws_vpc" "rosa" {
+  id = var.rosa_vpc_id
+}
+
+data "aws_subnet" "rosa_private" {
+  for_each = toset(var.rosa_private_subnet_ids)
+  id       = each.value
+}
