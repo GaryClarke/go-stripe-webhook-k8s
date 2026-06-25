@@ -93,3 +93,13 @@ jobs:
                   -t "${REGISTRY}/${REPOSITORY}:latest" \
                   --push \
                   .
+
+                  docker buildx build \
+                  --platform linux/amd64 \
+                  --target migrate \
+                  --provenance=false \
+                  --sbom=false \
+                  -t "${REGISTRY}/${REPOSITORY}-migrate:${IMAGE_TAG}" \
+                  -t "${REGISTRY}/${REPOSITORY}-migrate:latest" \
+                  --push \
+                  .

@@ -84,16 +84,53 @@ jobs:
                     --from-literal=DATABASE_URL="$DATABASE_URL" \
                     --dry-run=client -o yaml | oc apply -f -
 
-            - uses: actions/setup-go@v5
-              if: steps.oc.outputs.skip != 'true'
-              with:
-                  go-version: "1.26"
-
-            - name: Run database migrations
+            - name: Run database migrations (in cluster)
               if: steps.oc.outputs.skip != 'true'
               env:
-                  DATABASE_URL: ${{ secrets.DATABASE_URL }}
-              run: go tool goose -dir migrations postgres "$DATABASE_URL" up
+                  IMAGE_TAG: ${{ github.event.workflow_run.head_sha }}
+                  AWS_REGION: ${{ vars.AWS_REGION || 'eu-west-1' }}
+                  REPOSITORY: ${{ vars.ECR_REPOSITORY || 'go-stripe-webhook-k8s' }}
+                  REGISTRY: 234290944523.dkr.ecr.${{ vars.AWS_REGION || 'eu-west-1' }}.amazonaws.com
+              run: |
+                  set -euo pipefail
+                  JOB_NAME="goose-migrate-${IMAGE_TAG:0:12}"
+                  MIGRATE_IMAGE="${REGISTRY}/${REPOSITORY}-migrate:${IMAGE_TAG}"
+
+                  oc delete job "${JOB_NAME}" -n go-stripe-webhook --ignore-not-found=true
+
+                  cat <<EOF | oc apply -f -
+                  apiVersion: batch/v1
+                  kind: Job
+                  metadata:
+                    name: ${JOB_NAME}
+                    namespace: go-stripe-webhook
+                  spec:
+                    ttlSecondsAfterFinished: 600
+                    backoffLimit: 1
+                    template:
+                      spec:
+                        restartPolicy: Never
+                        imagePullSecrets:
+                          - name: ecr-registry
+                        containers:
+                          - name: migrate
+                            image: ${MIGRATE_IMAGE}
+                            env:
+                              - name: DATABASE_URL
+                                valueFrom:
+                                  secretKeyRef:
+                                    name: database-url
+                                    key: DATABASE_URL
+                            resources:
+                              requests:
+                                cpu: 50m
+                                memory: 64Mi
+                              limits:
+                                memory: 128Mi
+                  EOF
+
+                  oc wait --for=condition=complete "job/${JOB_NAME}" -n go-stripe-webhook --timeout=5m
+                  oc logs "job/${JOB_NAME}" -n go-stripe-webhook
 
             - name: Apply manifests and roll out image
               if: steps.oc.outputs.skip != 'true'

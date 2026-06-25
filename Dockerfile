@@ -22,6 +22,9 @@ ARG TARGETARCH=amd64
 RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} \
     go build -trimpath -ldflags="-s -w" -o /out/api ./cmd/api
 
+RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} \
+    go build -trimpath -ldflags="-s -w" -o /out/goose github.com/pressly/goose/v3/cmd/goose
+
 
 ########################################
 # Stage 2: Minimal runtime image
@@ -37,3 +40,20 @@ USER 65532:65532
 EXPOSE 8080
 
 ENTRYPOINT ["/api"]
+
+
+########################################
+# Stage 3: In-cluster Goose migrations (private RDS — not reachable from GHA)
+########################################
+
+FROM debian:bookworm-slim AS migrate
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --from=builder --chmod=755 /out/goose /usr/local/bin/goose
+COPY migrations /migrations
+COPY --chmod=755 scripts/goose-up.sh /goose-up.sh
+
+ENTRYPOINT ["/goose-up.sh"]

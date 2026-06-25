@@ -100,7 +100,7 @@ When the cluster is **off**, **Deploy ROSA** on push to **`main`** **skips** (ex
 - **Workflow:** **`.github/workflows/deploy-rosa.yaml`** runs after **`CI`** succeeds on **`main`**.
 - **Trigger:** every **`push` to `main`** (after **`push-ecr`** in **`ci.yaml`**).
 - **Skips** (exit 0) when cluster is off, **`ROSA_API_URL`** unset, or **`oc login`** fails.
-- **Deploy steps:** sync **`ecr-registry`** + **`stripe-webhook-secret`** + **`database-url`**, **`go tool goose … up`**, **`oc apply -k k8s/overlays/rosa`**, **`oc set image`** to **`github.sha`**, smoke **`/readyz`**.
+- **Deploy steps:** sync **`ecr-registry`** + **`stripe-webhook-secret`** + **`database-url`**, run Goose **`Job`** in-cluster (private RDS is not reachable from GHA), **`oc apply -k k8s/overlays/rosa`**, **`oc set image`** to **`github.sha`**, smoke **`/readyz`**.
 - **GitHub:** see **GitHub Actions configuration** below.
 
 ---
