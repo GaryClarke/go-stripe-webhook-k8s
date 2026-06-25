@@ -69,3 +69,34 @@ resource "aws_db_subnet_group" "webhook" {
     Name = "go-stripe-webhook-rds"
   }
 }
+
+resource "aws_db_instance" "webhook" {
+  identifier = var.db_identifier
+
+  engine         = "postgres"
+  engine_version = "16"
+  instance_class = var.db_instance_class
+
+  allocated_storage = var.db_allocated_storage_gb
+  storage_type      = "gp3"
+
+  db_name  = var.db_name
+  username = var.db_username
+  password = var.db_master_password
+
+  db_subnet_group_name   = aws_db_subnet_group.webhook.name
+  vpc_security_group_ids = [aws_security_group.rds.id]
+
+  # Lab: single-AZ, co-located with ROSA workers (eu-west-1a).
+  availability_zone   = "eu-west-1a"
+  publicly_accessible = false
+  multi_az            = false
+
+  backup_retention_period = 0
+  skip_final_snapshot     = true
+  deletion_protection     = false
+
+  tags = {
+    Name = var.db_identifier
+  }
+}
