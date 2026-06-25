@@ -99,7 +99,7 @@ jobs:
                   --target migrate \
                   --provenance=false \
                   --sbom=false \
-                  -t "${REGISTRY}/${REPOSITORY}-migrate:${IMAGE_TAG}" \
-                  -t "${REGISTRY}/${REPOSITORY}-migrate:latest" \
+                  -t "${REGISTRY}/${REPOSITORY}:${IMAGE_TAG}-migrate" \
+                  -t "${REGISTRY}/${REPOSITORY}:migrate-latest" \
                   --push \
                   .

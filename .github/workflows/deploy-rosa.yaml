@@ -94,7 +94,7 @@ jobs:
               run: |
                   set -euo pipefail
                   JOB_NAME="goose-migrate-${IMAGE_TAG:0:12}"
-                  MIGRATE_IMAGE="${REGISTRY}/${REPOSITORY}-migrate:${IMAGE_TAG}"
+                  MIGRATE_IMAGE="${REGISTRY}/${REPOSITORY}:${IMAGE_TAG}-migrate"
 
                   oc delete job "${JOB_NAME}" -n go-stripe-webhook --ignore-not-found=true
 
