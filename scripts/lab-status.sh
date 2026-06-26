@@ -85,6 +85,14 @@ else
 	fi
 fi
 
+# --- Route host (DNS suffix changes after cluster recreate) ---
+if oc whoami >/dev/null 2>&1; then
+	if route_host="$(oc get route "${DEPLOYMENT}" -n "${OC_PROJECT}" -o jsonpath='{.spec.host}' 2>/dev/null)" && [ -n "$route_host" ]; then
+		ROUTE_HOST="$route_host"
+		READYZ_URL="https://${ROUTE_HOST}/readyz"
+	fi
+fi
+
 # --- HTTP smoke ---
 say ""
 say "Route /readyz: ${READYZ_URL}"
