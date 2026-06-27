@@ -4,7 +4,7 @@
 
 **Git branch:** `16-idempotency-postgres`
 
-**Status:** **In progress** — Phases **1–8** shipped on branch (app + local Postgres + integration tests + **`/readyz`** ping + K8s **`DATABASE_URL`** + deploy **`goose up`**). **Phase 8 cluster done gate** pending **Phase 9** (RDS + GitHub **`DATABASE_URL`** secret). Next: **Phase 9–10**.
+**Status:** **Complete on `main`** — Phases **0–10** shipped and verified on **`gc-rosa-lab`**: RDS (**`infra/terraform/rds/`**), in-cluster Goose **Job**, **`replicas: 2`**, Stripe resend → **`stripe_event_duplicate_skipped`**, one row per **`event_id`** in **`processed_events`** on RDS.
 
 **Prerequisite:** **Milestone 7** mostly shipped on **`main`** (ROSA deploy, CI, lab scripts). **M7 Phase 5 done gate** can close in parallel — does **not** block local M8 work (Phases 0–7).
 
@@ -247,9 +247,9 @@ Work **in this sequence**. Each phase has a **done gate** before the next.
 1. ~~**`config.Load`:** require **`DATABASE_URL`**.~~ **Done in Phase 5** (local + **`go run`**).
 2. ~~**`k8s/base/deployment.yaml`:** env from Secret **`database-url`**.~~ **Shipped.**
 3. ~~**`deploy-rosa.yaml`:** sync secret from GitHub (match **`stripe-webhook-secret`** pattern).~~ **Shipped.**
-4. ~~Run Goose migrations against RDS/DB before or during deploy.~~ **Shipped:** **`go tool goose … up`** in **`deploy-rosa.yaml`** after secret sync, before rollout (requires reachable **`DATABASE_URL`** — Phase 9).
+4. ~~Run Goose migrations against RDS/DB before or during deploy.~~ **Shipped:** in-cluster Goose **Job** in **`deploy-rosa.yaml`** (private RDS not reachable from GHA).
 
-**Done gate:** Pod **Ready** on cluster; webhook persists events. *(Needs Phase 9 RDS + GitHub **`DATABASE_URL`**.)*
+**Done gate:** Pod **Ready** on cluster; webhook persists events. **Verified** with Phase 9 RDS.
 
 ---
 
@@ -298,12 +298,12 @@ Work **in this sequence**. Each phase has a **done gate** before the next.
 | **`internal/config/config.go`** | **Shipped:** **`DATABASE_URL`** required |
 | **`cmd/api/logmsg.go`** | **Shipped:** idempotency + **`store_init_failed`** + **`readyz_db_check_failed`** |
 | **`k8s/base/deployment.yaml`** | **Shipped:** **`DATABASE_URL`** from **`database-url`** Secret |
-| **`k8s/overlays/rosa`** | **Pending:** **`replicas: 2`** (Phase 10); RDS DSN via secret (Phase 9) |
-| **`.github/workflows/deploy-rosa.yaml`** | **Shipped:** **`database-url`** secret + **`goose up`** before rollout |
+| **`k8s/overlays/rosa`** | **Shipped:** **`replicas: 2`** (Phase 10); base stays **`1`** |
+| **`.github/workflows/deploy-rosa.yaml`** | **Shipped:** **`database-url`** secret + in-cluster Goose **Job** before rollout |
 | | **`docker-compose.yaml`** — **shipped** |
 | | **`migrations/`** + Goose — **shipped** |
 | | **`internal/store/`** — **shipped** |
-| | **`infra/terraform/rds/`** — **pending** (Phase 9) |
+| | **`infra/terraform/rds/`** — **shipped** (Phase 9) |
 
 ---
 
@@ -318,8 +318,19 @@ Work **in this sequence**. Each phase has a **done gate** before the next.
 - [x] Phase 6: Integration duplicate delivery (+ concurrent bonus test)
 - [x] Phase 7: **`/readyz`** DB check
 - [x] Phase 8: K8s **`DATABASE_URL`** + deploy **`goose up`** (cluster verify → Phase 9)
-- [ ] Phase 9: RDS on ROSA
-- [ ] Phase 10: **`replicas: 2+`** cross-Pod dedupe
+- [x] Phase 9: RDS on ROSA
+- [x] Phase 10: **`replicas: 2+`** cross-Pod dedupe
+
+---
+
+## Verify (cluster — `gc-rosa-lab`)
+
+1. **`terraform apply`** in **`infra/terraform/rds/`** → GitHub **`DATABASE_URL`**; deploy green.
+2. **`oc get pods -l app=go-stripe-webhook-k8s`** → **2/2 Ready**.
+3. **`stripe trigger invoice.payment_succeeded`** → **`stripe_event_accepted`** in **`oc logs`**; row in **`processed_events`**.
+4. Stripe Dashboard **Resend** same event → **`stripe_event_duplicate_skipped`**; **`COUNT(*) = 1`** for that **`event_id`**.
+
+**Example (2026-06-26):** `evt_1TmdzVIq4hctS9aMAf0uqETr` — accept on first delivery, duplicate skipped on resend, one **`processed`** row on RDS.
 
 ---
 

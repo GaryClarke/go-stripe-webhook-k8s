@@ -56,7 +56,7 @@ Each milestone lists **what to learn**, **what changes in the repo**, and **how 
 
 **Milestone 1 status:** Complete on **`main`**: probes, webhook stub, graceful shutdown, **`Recover`**, **`internal/dbg`**, tests including **`TestAPI_Readyz`**. **Milestone 2** verification landed on **`8-stripe-webhook-verify`** (see [Milestone 2](#milestone-2-configuration-and-secrets)).
 
-**Note on readiness:** For v1, `/readyz` may match `/livez` until **Milestone 8** adds shared dependencies (managed **Postgres** for idempotency). Document the chosen rule under [Decisions](#decisions) when it changes.
+**Note on readiness:** **`/readyz`** pings Postgres (Milestone 8); **`/livez`** stays process-only. See [Decisions](#decisions).
 
 **`cmd/api` layout:** HTTP routes are registered on **`(*App).routes()`** (`cmd/api/app.go`); handlers live in **`cmd/api/handlers.go`**. **`main`** loads config, **`NewApp`**, **`Recover(app.routes())`**, and server lifecycle only. **`POST /webhooks/stripe`** uses **`app.cfg.StripeWebhookSecret`** with **`stripe.ConstructEvent`**. **Future:** pass more dependencies on **`App`** (e.g. downstream clients).
 
@@ -224,7 +224,9 @@ In-memory dedupe is acceptable only as a **demonstration** with explicit “sing
 
 **Branch (suggested):** **`16-idempotency-postgres`** — see **[docs/branches/16-idempotency-postgres.md](docs/branches/16-idempotency-postgres.md)**.
 
-**Milestone 8 status:** **In progress** on branch **`16-idempotency-postgres`**. **Phases 1–8 shipped:** local + app idempotency, integration tests, **`/readyz`** DB ping, K8s **`DATABASE_URL`**, deploy secret sync + **`goose up`**. **Next:** Phase **9** RDS (real **`DATABASE_URL`**), Phase **10** multi-replica proof. See **[docs/branches/16-idempotency-postgres.md](docs/branches/16-idempotency-postgres.md)**.
+**Milestone 8 status:** **Complete on `main`**. Shipped and verified: Postgres ledger, Goose migrations, **`/readyz`** DB ping, Terraform **RDS**, in-cluster migrate **Job**, **`replicas: 2`** on ROSA; duplicate **`event_id`** → one row, **204**, **`stripe_event_duplicate_skipped`**. See **[docs/branches/16-idempotency-postgres.md](docs/branches/16-idempotency-postgres.md)**. **Next:** **Milestone 9** (Kafka).
+
+**Milestone 9 status:** **In progress** on branch **`17-kafka-outbox`**. Decisions locked: **Redpanda** locally, **transactional outbox**, ledger status **`accepted`** (Option A), **204** = durably accepted for async processing. See **[docs/branches/17-kafka-outbox.md](docs/branches/17-kafka-outbox.md)**.
 
 ---
 
@@ -233,10 +235,12 @@ In-memory dedupe is acceptable only as a **demonstration** with explicit “sing
 | | |
 |--|--|
 | **Learn** | Topics; producer and consumer; offsets; **at-least-once** delivery and idempotent consumers. |
-| **Build** | Webhook publishes to Kafka; separate consumer consumes and persists or displays data. |
-| **Done when** | `Stripe webhook → Kafka → consumer` works in a **local** dev setup (e.g. Compose or lightweight broker), with README steps documented. |
+| **Build** | **Transactional outbox** (**`outbox_events`**) in same TX as ingestion claim; **`cmd/publisher`** → **Kafka-compatible** broker (**Redpanda** in Compose); **`cmd/worker`** consumer; ledger status **`accepted`** (not downstream **processed**). Branch doc: **[docs/branches/17-kafka-outbox.md](docs/branches/17-kafka-outbox.md)**. |
+| **Done when** | `Stripe webhook → outbox → Kafka → consumer` works in a **local** dev setup, with README steps documented. |
 
-You do not need a full cluster-distributed Kafka on day one; pick one local story and document it.
+You do not need a full cluster-distributed Kafka on day one; **Redpanda** in Compose is the chosen local story.
+
+**Branch (suggested):** **`17-kafka-outbox`** — see **[docs/branches/17-kafka-outbox.md](docs/branches/17-kafka-outbox.md)**.
 
 ---
 
