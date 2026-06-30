@@ -46,6 +46,27 @@ curl -sS http://localhost:8080/livez
 
 Signed webhooks persist idempotency state in **`processed_events`** when Postgres is up. See [docs/branches/16-idempotency-postgres.md](docs/branches/16-idempotency-postgres.md) for the full M8 flow.
 
+### Local Kafka (Milestone 9 — Redpanda)
+
+**Redpanda** runs in Docker Compose as a **Kafka-compatible** broker (local dev only). **Redpanda Console** is a web UI for topics, messages, and (later) consumer lag.
+
+```bash
+make kafka-up          # broker + Console (or make db-up for Postgres too)
+make kafka-check       # cluster info
+make kafka-smoke       # produce + consume one test message on stripe-events
+```
+
+| Service | Host URL |
+|---------|----------|
+| **Kafka API** | **`localhost:19092`** — set **`KAFKA_BROKERS`** for Go apps on your Mac |
+| **Console** | **http://localhost:8888** |
+| **Postgres** | **`localhost:5433`** (unchanged from M8) |
+| **HTTP API** | **`localhost:8080`** — **`cmd/api`**, not in Compose |
+
+Inside Compose (Console → broker), clients use **`redpanda:9092`**. **`rpk`** smoke tests: see **`make kafka-smoke`**. Produce via stdin (current **`rpk`**): `printf '%s\n' '{"stripe_event_id":"evt_test"}' | docker compose exec -T redpanda rpk topic produce stripe-events -k evt_test`.
+
+Full M9 plan: [docs/branches/17-kafka-outbox.md](docs/branches/17-kafka-outbox.md).
+
 Historical Lambda / queue notes from the parent project live in [docs/PROJECT_KNOWLEDGE.md](docs/PROJECT_KNOWLEDGE.md).
 
 ## Tests and quality

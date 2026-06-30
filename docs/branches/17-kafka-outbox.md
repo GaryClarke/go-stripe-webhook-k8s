@@ -168,11 +168,11 @@ Work in sequence. **M9a** before **M9b**.
 
 **Do:**
 
-1. Add **`redpanda`** (or **`redpanda-console`** optional) to **`docker-compose.yaml`**.
-2. Makefile targets e.g. **`kafka-up`**, **`kafka-down`** (or extend **`db-up`** docs).
-3. Document broker URL and topic creation (**`rpk`** or auto-create on first produce).
+1. Add **`redpanda`** and **`console`** to **`docker-compose.yaml`**.
+2. Makefile targets: **`kafka-up`**, **`kafka-down`**, **`kafka-check`**, **`kafka-smoke`** ( **`db-up`** starts the full stack).
+3. Document ports in **`docker-compose.yaml`** header and **README.md**.
 
-**Done gate:** **`docker compose up`** → produce/consume smoke ( **`rpk`** or tiny Go spike).
+**Done gate:** **`make kafka-smoke`** succeeds; Console at **http://localhost:8888** shows **`stripe-events`**.
 
 ---
 
@@ -291,7 +291,7 @@ Work in sequence. **M9a** before **M9b**.
 ## Verify checklist
 
 - [ ] Phase 0: Three layers + **204 semantics** understood
-- [ ] M9a Phase 1: Redpanda in Compose healthy
+- [x] M9a Phase 1: Redpanda in Compose healthy
 - [ ] M9a Phase 2: Worker consumes test message
 - [ ] M9a Phase 3: Job JSON spike end-to-end
 - [ ] M9b Phase 4: Migration + outbox in accept TX

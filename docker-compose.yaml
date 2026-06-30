@@ -1,11 +1,17 @@
-# Local PostgreSQL for M8 idempotency work (dev + integration tests).
-# RDS in AWS is separate — provisioned later via Terraform (Phase 9).
+# Local dev stack: Postgres (M8) + Redpanda + Console (M9a).
+# RDS in AWS is separate — see infra/terraform/rds/.
 #
-# Start:  docker compose up -d
-#         or: make db-up   (after Makefile targets land in snippet 3)
+# Start all:  make db-up     (docker compose up -d — every service)
+# Kafka only: make kafka-up  (redpanda + console)
 #
-# Dev DB:  stripe_webhook_dev   (default DB, created automatically)
-# Test DB: stripe_webhook_test  (created by init script in snippet 2)
+# Ports (host):
+#   Postgres  localhost:5433
+#   Kafka     localhost:19092   (KAFKA_BROKERS for Go on the Mac)
+#   Console   http://localhost:8888
+#   API       localhost:8080      (cmd/api — not in Compose)
+#
+# Dev DB:  stripe_webhook_dev
+# Test DB: stripe_webhook_test  (init script in docker/postgres/init)
 
 services:
     db:
@@ -31,6 +37,63 @@ services:
             interval: 3s
             timeout: 5s
             retries: 5
+    redpanda:
+        image: docker.redpanda.com/redpandadata/redpanda:v26.1.11
+        container_name: stripe-webhook-redpanda
+        command:
+            - redpanda
+            - start
+            - --mode
+            - dev-container
+            - --smp
+            - "1"
+            - --kafka-addr
+            - internal://0.0.0.0:9092,external://0.0.0.0:19092
+            - --advertise-kafka-addr
+            - internal://redpanda:9092,external://localhost:19092
+            - --schema-registry-addr
+            - internal://0.0.0.0:8081,external://0.0.0.0:18081
+            - --pandaproxy-addr
+            - internal://0.0.0.0:8082,external://0.0.0.0:18082
+            - --advertise-pandaproxy-addr
+            - internal://redpanda:8082,external://localhost:18082
+            - --rpc-addr
+            - redpanda:33145
+            - --advertise-rpc-addr
+            - redpanda:33145
+        ports:
+            - "19092:19092"
+            - "18081:18081"
+            - "18082:18082"
+            - "19644:9644"
+        volumes:
+            - redpanda_data:/var/lib/redpanda/data
+        healthcheck:
+            test: [ "CMD-SHELL", "rpk cluster health | grep -E 'Healthy:.+true' || exit 1" ]
+            interval: 10s
+            timeout: 5s
+            retries: 5
+            start_period: 15s
+    console:
+        image: docker.redpanda.com/redpandadata/console:v3.7.4
+        container_name: stripe-webhook-redpanda-console
+        depends_on:
+            redpanda:
+                condition: service_healthy
+        ports:
+            - "8888:8080"
+        environment:
+            CONFIG_FILEPATH: /tmp/config.yml
+            CONSOLE_CONFIG_FILE: |
+                kafka:
+                  brokers: ["redpanda:9092"]
+                redpanda:
+                  adminApi:
+                    enabled: true
+                    urls: ["http://redpanda:9644"]
+        entrypoint: /bin/sh
+        command: -c 'echo "$$CONSOLE_CONFIG_FILE" > /tmp/config.yml; /app/console'
 
 volumes:
     stripe_webhook_pgdata:
+    redpanda_data:

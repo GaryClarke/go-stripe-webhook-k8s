@@ -33,7 +33,8 @@ fmt:
 	terraform fmt -recursive terraform/
 
 .PHONY: build test lint tidy fmt lab-status lab-ecr-refresh lab-on lab-off \
-	db-up db-down db-logs db-check db-migrate db-migrate-test
+	db-up db-down db-logs db-check db-migrate db-migrate-test \
+	kafka-up kafka-down kafka-logs kafka-check kafka-smoke
 
 # --- Local Postgres (M8 Phase 1) — see docs/branches/16-idempotency-postgres.md ---
 # Dev and test are separate DATABASE names on the same Compose service (port 5433).
@@ -41,7 +42,7 @@ fmt:
 DATABASE_URL_DEV ?= postgres://webhook:webhook@localhost:5433/stripe_webhook_dev?sslmode=disable
 DATABASE_URL_TEST ?= postgres://webhook:webhook@localhost:5433/stripe_webhook_test?sslmode=disable
 
-# Start local Postgres (detached). Reuses existing volume unless you ran db-down with -v.
+# Start local Compose stack (Postgres + Redpanda + Console). Reuses volumes unless db-down -v.
 db-up:
 	docker compose up -d
 
@@ -66,3 +67,29 @@ db-migrate:
 
 db-migrate-test:
 	$(GOOSE) -dir migrations postgres "$(DATABASE_URL_TEST)" up
+
+# --- Local Redpanda (M9a Phase 1) — see docs/branches/17-kafka-outbox.md ---
+# Kafka-compatible broker for local dev. Go clients on the host use localhost:19092 (not 9092).
+
+KAFKA_BROKERS ?= localhost:19092
+KAFKA_TOPIC ?= stripe-events
+
+# Start broker + Console only (Postgres can stay stopped).
+kafka-up:
+	docker compose up -d redpanda console
+
+kafka-down:
+	docker compose stop redpanda console
+
+kafka-logs:
+	docker compose logs -f redpanda console
+
+# Broker healthy + cluster metadata.
+kafka-check:
+	docker compose ps redpanda console
+	docker compose exec redpanda rpk cluster info
+
+# Produce one test record and consume it (Phase 1 done gate).
+kafka-smoke:
+	printf '%s\n' '{"stripe_event_id":"evt_smoke"}' | docker compose exec -T redpanda rpk topic produce $(KAFKA_TOPIC) -k evt_smoke
+	docker compose exec redpanda rpk topic consume $(KAFKA_TOPIC) -o -1 -n 1
