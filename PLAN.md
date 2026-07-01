@@ -240,6 +240,8 @@ In-memory dedupe is acceptable only as a **demonstration** with explicit “sing
 
 You do not need a full cluster-distributed Kafka on day one; **Redpanda** in Compose is the chosen local story.
 
+**Production broker + cluster deploy are deferred until after M9 done gate.** Same Go binaries; differences are **env + infra only** (see **[docs/branches/17-kafka-outbox.md](docs/branches/17-kafka-outbox.md)** — **Follow-ups (post-M9, ordered)**).
+
 **Branch (suggested):** **`17-kafka-outbox`** — see **[docs/branches/17-kafka-outbox.md](docs/branches/17-kafka-outbox.md)**.
 
 ---

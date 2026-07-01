@@ -304,7 +304,62 @@ Work in sequence. **M9a** before **M9b**.
 
 ## Follow-ups
 
-- **Consumer completion table** — record downstream **`processed`** / **`failed`** separately from ingestion ledger
-- **ROSA stretch** — run publisher + worker on cluster; or single Deployment with sidecars (document tradeoffs)
-- **M8 doc alignment** — **`16-idempotency-postgres.md`** historical **`processed`** wording vs M9 **`accepted`** (comment in migration README)
-- **Observability stretch** — **`event_id`** on publisher/worker logs tied to **`request_id`** where possible
+Work **after** M9 **done gate** (local E2E documented). **Do not start these until M9b Phase 8 passes** — order matters.
+
+### Portable code rule (apply during M9, not a follow-up)
+
+- **`cmd/api`**, **`cmd/publisher`**, **`cmd/worker`** share no "local mode" branches in Go.
+- **Local vs prod** = **env vars + deploy manifests only** (brokers, topic, group, TLS/SASL when needed).
+- **Redpanda in Compose** = dev infra; clients use **`KAFKA_BROKERS`** (local: **`localhost:19092`**; prod: MSK/broker endpoints).
+
+---
+
+### Post-M9 follow-ups (recommended order)
+
+| Step | Track | What | Why this order |
+|------|-------|------|----------------|
+| **1** | **App hardening** | Consumer completion table; DLQ / retry policy for outbox **`failed`**; stale **`processing`** reclaim (if needed) | Finish **behaviour** locally before new infra |
+| **2** | **K8s / ROSA** | **`k8s/`** Deployments (or separate overlays) for **`cmd/publisher`** + **`cmd/worker`**; Secrets for **`KAFKA_*`** + publisher **`DATABASE_URL`**; extend **`deploy-rosa.yaml`** or sibling workflow (ECR tags for extra binaries) | Run async pipeline on cluster **before** managed broker Terraform |
+| **3** | **Broker choice** | Decide **MSK** vs **Redpanda Cloud** vs in-VPC self-managed; document in **`docs/`** | Informs Terraform and **`KAFKA_BROKERS`** in prod |
+| **4** | **Terraform** | e.g. **`infra/terraform/kafka/`** (MSK cluster, SG, bootstrap brokers output) — separate state key like RDS | Broker reachable from ROSA VPC workers |
+| **5** | **Kafka auth** | TLS + SASL (or IAM for MSK) via env: e.g. **`KAFKA_TLS_ENABLED`**, **`KAFKA_SASL_*`** — wire in shared **`internal/kafka`** client config | Same consumer/publisher code; stricter broker in prod |
+| **6** | **Secrets automation** | GitHub / **External Secrets** for **`KAFKA_*`** and outbox DB (align with PLAN OpenShift deploy stretch) | No manual **`oc create secret`** each lab session |
+| **7** | **Observability** | **`event_id`** on publisher/worker logs; consumer **lag** alerts (Console locally; CloudWatch/Prometheus in prod) | Ops narrative after pipeline runs in prod |
+
+---
+
+### Post-M9 detail (by track)
+
+**Kubernetes / ROSA (step 2)**
+
+- Separate Deployments vs sidecars in API pod — document tradeoff (independent scale vs ops simplicity).
+- Publisher needs **private RDS** access (same VPC pattern as M8 **`cmd/api`**).
+- Worker needs **Kafka** reachability only (no Stripe secret).
+- CI: build/push **`cmd/publisher`** and **`cmd/worker`** images (mirror **`api`** / **`migrate`** tag pattern).
+
+**Managed Kafka / Terraform (steps 3–4)**
+
+- **MSK** in same AWS account/VPC as ROSA (parallel to **`infra/terraform/rds/`**).
+- Outputs: bootstrap broker list → GitHub Secret or **`KAFKA_BROKERS`** Variable.
+- **Not in M9:** no MSK module until local outbox + publisher + worker path is proven.
+
+**TLS / SASL (step 5)**
+
+- Local Redpanda: plaintext on **`localhost:19092`** (Compose only).
+- Prod: enable TLS/SASL in client dialer from env — **no rewrite** of consume/publish loops.
+- Document required env vars in README when implemented.
+
+**App / data model (step 1)**
+
+- **Consumer completion table** — downstream **`processed`** / **`failed`** separate from ingestion **`accepted`** ledger.
+- **Outbox **`failed`** rows** — retry counter, DLQ topic, or manual replay (pick one when needed).
+
+**Docs / cleanup (anytime after M9)**
+
+- **`16-idempotency-postgres.md`** — historical **`processed`** wording vs M9 **`accepted`**.
+- Optional: remove **`internal/engine.StripeEvent`** if unused.
+
+**Observability (step 7)**
+
+- Tie **`event_id`** across API → outbox → publisher → worker where possible.
+- **Consumer lag** as primary Kafka health metric (learned via Redpanda Console locally).
