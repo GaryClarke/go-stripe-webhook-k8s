@@ -28,6 +28,9 @@
 | **Job mapping** | **`cmd/api`** maps **`stripe.Event`** → **`engine.Job`** after **`ConstructEvent`** — keep **`internal/store`** on string primitives; avoid Stripe imports in **`internal/engine`** if adding new helpers |
 | **Topic (local)** | e.g. **`stripe-events`** — single topic for M9 |
 | **Consumer delivery** | **At-least-once** — worker must be idempotent (key on **`stripe_event_id`**) |
+| **Go Kafka client** | **[`twmb/franz-go`](https://github.com/twmb/franz-go)** (`kgo`) — not `segmentio/kafka-go`; one client library for worker + publisher; TLS/SASL/IAM via opts later without changing consume/publish loops |
+| **Consumer commit** | **Manual commit after successful handle** — `DisableAutoCommit` + `CommitRecords`; aligns with at-least-once and makes retry-on-failure explicit (M9a spike onward) |
+| **Rebalance safety** | **`BlockRebalanceOnPoll`** + **`AllowRebalance`** after batch commit — finish in-flight records before partition handoff |
 | **Publisher** | Separate process **`cmd/publisher`** (or named **`cmd/outbox-publisher`**) — poll unpublished outbox rows, publish, mark published |
 | **Worker** | **`cmd/worker`** — consumer group, read topic, handle **`Job`** (M9: structured log) |
 | **M9 done gate** | **Local only:** **`stripe listen`** → API → outbox → publisher → Kafka → worker; README steps documented |
@@ -180,11 +183,27 @@ Work in sequence. **M9a** before **M9b**.
 
 **Do:**
 
-1. Add **`cmd/worker/main.go`** — connect to broker, join consumer group, read **`stripe-events`**, log payload.
-2. Config: **`KAFKA_BROKERS`**, **`KAFKA_TOPIC`**, **`KAFKA_GROUP_ID`** (env, validated at startup).
-3. Use a minimal Go Kafka client (e.g. **`segmentio/kafka-go`** — add dep when implementing).
+1. **`go get github.com/twmb/franz-go/pkg/kgo`**
+2. **`internal/config/worker.go`** — **`LoadWorker()`**: **`KAFKA_BROKERS`** (comma-separated), **`KAFKA_TOPIC`**, **`KAFKA_GROUP_ID`**; separate from API **`config.Load()`** (worker has no Stripe/DB).
+3. **`cmd/worker/`** — JSON logger + log message constants (mirror **`cmd/api`**); **`main.go`** with **`kgo.NewClient`**:
+   - **`SeedBrokers`**, **`ConsumerGroup`**, **`ConsumeTopics`**
+   - **`ClientID("stripe-webhook-worker")`** — visible in broker/Console metrics
+   - **`DisableAutoCommit`**, **`BlockRebalanceOnPoll`**
+   - Loop: **`PollFetches(ctx)`** → unmarshal/log → **`CommitRecords`** → **`AllowRebalance`**
+   - Graceful shutdown: **`signal.NotifyContext`** cancels **`PollFetches`**; **`client.Close()`** on exit
+4. Makefile **`worker-run`** with local env defaults (same as **`KAFKA_BROKERS`** / **`KAFKA_TOPIC`** in Makefile).
 
-**Done gate:** Manual publish (CLI or spike producer) → worker logs message.
+**Local env (defaults):**
+
+```bash
+KAFKA_BROKERS=localhost:19092
+KAFKA_TOPIC=stripe-events
+KAFKA_GROUP_ID=stripe-webhook-worker
+```
+
+**Verify:** **`make worker-run`**, then produce a **`engine.Job`** JSON record (see Phase 3 shape); worker logs **`stripe_job_consumed`** (or raw payload log for first spike). Consumer group visible in Console **http://localhost:8888**.
+
+**Done gate:** Manual publish (CLI or spike producer) → worker logs message; offset committed (re-start worker does not replay unless you produce again).
 
 ---
 
@@ -283,7 +302,7 @@ Work in sequence. **M9a** before **M9b**.
 | | **`migrations/00002_ledger_accepted_and_outbox.sql`** |
 | | **`cmd/worker/`** |
 | | **`cmd/publisher/`** |
-| | **`internal/kafka/`** or **`internal/queue/`** (producer/consumer wrappers) |
+| | **`internal/kafka/`** — shared **`kgo`** client opts (brokers, TLS/SASL from env; M9b+ when publisher lands) |
 | **`README.md`** | Local M9 runbook |
 
 ---
