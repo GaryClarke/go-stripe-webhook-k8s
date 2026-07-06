@@ -1,8 +1,6 @@
 # Integration Engine - common tasks
 # See docs/PROJECT_KNOWLEDGE.md for project overview.
 
-.PHONY: build test lint tidy fmt lab-status lab-ecr-refresh lab-on lab-off
-
 # ROSA lab (gc-rosa-lab) — see docs/rosa/runbook.md and cursor-rules.md "start work"
 lab-status:
 	./scripts/lab-status.sh
@@ -22,6 +20,10 @@ build:
 test:
 	go test -v ./...
 
+# Kafka worker integration test (requires make kafka-up). Excluded from default go test via //go:build integration.
+test-integration:
+	go test -tags=integration ./cmd/worker/... -run TestWorker_ConsumeJob_Integration -v
+
 lint:
 	go vet ./...
 	@command -v golangci-lint >/dev/null 2>&1 && golangci-lint run ./... || true
@@ -32,9 +34,9 @@ tidy:
 fmt:
 	terraform fmt -recursive terraform/
 
-.PHONY: build test lint tidy fmt lab-status lab-ecr-refresh lab-on lab-off \
+.PHONY: build test test-integration lint tidy fmt lab-status lab-ecr-refresh lab-on lab-off \
 	db-up db-down db-logs db-check db-migrate db-migrate-test \
-	kafka-up kafka-down kafka-logs kafka-check kafka-smoke
+	kafka-up kafka-down kafka-logs kafka-check kafka-smoke worker-run
 
 # --- Local Postgres (M8 Phase 1) — see docs/branches/16-idempotency-postgres.md ---
 # Dev and test are separate DATABASE names on the same Compose service (port 5433).

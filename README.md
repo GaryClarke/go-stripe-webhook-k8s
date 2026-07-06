@@ -72,7 +72,8 @@ Historical Lambda / queue notes from the parent project live in [docs/PROJECT_KN
 ## Tests and quality
 
 ```bash
-go test ./...
+go test ./...              # unit tests (CI); Kafka integration excluded by build tag
+make test-integration      # worker broker test — requires make kafka-up
 make lint
 ```
 

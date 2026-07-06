@@ -201,7 +201,9 @@ KAFKA_TOPIC=stripe-events
 KAFKA_GROUP_ID=stripe-webhook-worker
 ```
 
-**Verify:** **`make worker-run`**, then produce a **`engine.Job`** JSON record (see Phase 3 shape); worker logs **`stripe_job_consumed`** (or raw payload log for first spike). Consumer group visible in Console **http://localhost:8888**.
+**Verify:** **`make worker-run`**, then produce a **`engine.Job`** JSON record (see Phase 3 shape); worker logs **`stripe_job_consumed`**. Consumer group visible in Console **http://localhost:8888**.
+
+**Tests:** **`TestLoadWorker`**, **`TestHandleRecord`** (default **`go test ./...`**); **`TestWorker_ConsumeJob_Integration`** behind **`//go:build integration`** — **`make test-integration`** (requires **`make kafka-up`**). CI runs unit tests only; integration skips without a broker.
 
 **Done gate:** Manual publish (CLI or spike producer) → worker logs message; offset committed (re-start worker does not replay unless you produce again).
 
@@ -311,7 +313,7 @@ KAFKA_GROUP_ID=stripe-webhook-worker
 
 - [ ] Phase 0: Three layers + **204 semantics** understood
 - [x] M9a Phase 1: Redpanda in Compose healthy
-- [ ] M9a Phase 2: Worker consumes test message
+- [x] M9a Phase 2: Worker consumes test message
 - [ ] M9a Phase 3: Job JSON spike end-to-end
 - [ ] M9b Phase 4: Migration + outbox in accept TX
 - [ ] M9b Phase 5: Webhook → **`accepted`** + outbox **pending**
