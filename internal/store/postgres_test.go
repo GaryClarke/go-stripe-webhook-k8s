@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"encoding/json"
 	"os"
 	"testing"
 )
@@ -82,6 +83,103 @@ func TestProcessEvent_claimThenDuplicate(t *testing.T) {
 	}
 	if count != 1 {
 		t.Fatalf("row count = %d, want 1", count)
+	}
+}
+
+func TestAcceptEvent_claimThenDuplicate(t *testing.T) {
+	p := testPostgres(t)
+	resetLedger(t, p)
+	ctx := context.Background()
+
+	const (
+		eventID   = "evt_accept_claim_dup"
+		eventType = "invoice.payment_succeeded"
+	)
+	jobPayload := []byte(`{"stripe_event_id":"evt_accept_claim_dup","event_type":"invoice.payment_succeeded","payload":{}}`)
+
+	claimed, err := p.AcceptEvent(ctx, eventID, eventType, jobPayload)
+	if err != nil {
+		t.Fatalf("first AcceptEvent: %v", err)
+	}
+	if !claimed {
+		t.Fatal("first AcceptEvent: want claimed=true")
+	}
+
+	es, err := p.Status(ctx, eventID)
+	if err != nil {
+		t.Fatalf("Status after first accept: %v", err)
+	}
+	if !es.Found {
+		t.Fatal("Status: want Found=true after first accept")
+	}
+	if es.Status != StatusAccepted {
+		t.Fatalf("Status = %q, want %q", es.Status, StatusAccepted)
+	}
+
+	ob, err := p.OutboxStatus(ctx, eventID)
+	if err != nil {
+		t.Fatalf("OutboxStatus after first accept: %v", err)
+	}
+	if !ob.Found {
+		t.Fatal("OutboxStatus: want Found=true after first accept")
+	}
+	if ob.Status != OutboxPending {
+		t.Fatalf("OutboxStatus status = %q, want %q", ob.Status, OutboxPending)
+	}
+	var storedJob struct {
+		StripeEventID string `json:"stripe_event_id"`
+		EventType     string `json:"event_type"`
+	}
+	if err := json.Unmarshal(ob.Payload, &storedJob); err != nil {
+		t.Fatalf("unmarshal outbox payload: %v", err)
+	}
+	if storedJob.StripeEventID != eventID {
+		t.Fatalf("outbox stripe_event_id = %q, want %q", storedJob.StripeEventID, eventID)
+	}
+	if storedJob.EventType != eventType {
+		t.Fatalf("outbox event_type = %q, want %q", storedJob.EventType, eventType)
+	}
+
+	claimed, err = p.AcceptEvent(ctx, eventID, eventType, jobPayload)
+	if err != nil {
+		t.Fatalf("second AcceptEvent: %v", err)
+	}
+	if claimed {
+		t.Fatal("second AcceptEvent: want claimed=false on duplicate event_id")
+	}
+
+	es, err = p.Status(ctx, eventID)
+	if err != nil {
+		t.Fatalf("Status after duplicate: %v", err)
+	}
+	if es.Status != StatusAccepted {
+		t.Fatalf("Status after duplicate = %q, want %q", es.Status, StatusAccepted)
+	}
+
+	ob, err = p.OutboxStatus(ctx, eventID)
+	if err != nil {
+		t.Fatalf("OutboxStatus after duplicate: %v", err)
+	}
+	if ob.Status != OutboxPending {
+		t.Fatalf("OutboxStatus after duplicate = %q, want %q", ob.Status, OutboxPending)
+	}
+
+	var ledgerCount, outboxCount int
+	if err := p.db.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM processed_events WHERE event_id = $1`, eventID,
+	).Scan(&ledgerCount); err != nil {
+		t.Fatalf("count ledger rows: %v", err)
+	}
+	if ledgerCount != 1 {
+		t.Fatalf("ledger row count = %d, want 1", ledgerCount)
+	}
+	if err := p.db.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM outbox_events WHERE event_id = $1`, eventID,
+	).Scan(&outboxCount); err != nil {
+		t.Fatalf("count outbox rows: %v", err)
+	}
+	if outboxCount != 1 {
+		t.Fatalf("outbox row count = %d, want 1", outboxCount)
 	}
 }
 
