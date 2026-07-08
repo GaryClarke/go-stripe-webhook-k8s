@@ -24,13 +24,11 @@ func testPostgres(t *testing.T) *Postgres {
 	return p
 }
 
-// resetLedger clears processed_events so each test starts from an empty table.
-// Same package as Postgres, so tests can use the unexported db field.
+// resetLedger clears ledger and outbox so each test starts from empty tables.
 func resetLedger(t *testing.T, p *Postgres) {
 	t.Helper()
-	_, err := p.db.ExecContext(context.Background(), `TRUNCATE TABLE processed_events`)
-	if err != nil {
-		t.Fatalf("truncate processed_events: %v", err)
+	if err := p.TruncateLedger(context.Background()); err != nil {
+		t.Fatalf("truncate ledger: %v", err)
 	}
 }
 
