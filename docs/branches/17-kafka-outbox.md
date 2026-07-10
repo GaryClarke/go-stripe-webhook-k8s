@@ -4,7 +4,7 @@
 
 **Git branch:** `17-kafka-outbox`
 
-**Status:** **In progress** — branch doc and decisions locked; implementation not started.
+**Status:** **In progress** — M9a complete; **M9b Phase 5 complete** (webhook → `AcceptEvent`); Phase 6 (publisher) next.
 
 **Prerequisite:** **Milestone 8** complete on **`main`** (**`processed_events`**, Goose, **`/readyz`**, ROSA + RDS proof optional for M9 done gate).
 
@@ -232,6 +232,25 @@ KAFKA_GROUP_ID=stripe-webhook-worker
 
 **Done gate:** Integration test — webhook accept → one **`accepted`** row + one **`pending`** outbox row.
 
+**Shipped (`7dba66a`, `80d67d9`):**
+
+| Area | Delivered |
+|------|-----------|
+| **Migration** | **`migrations/00002_ledger_accepted_and_outbox.sql`** — ledger **`accepted`** CHECK; migrate M8 **`processed`** → **`accepted`**; **`outbox_events`** (1:1 **`event_id`**, **`payload` JSONB**, **`pending`/`published`/`failed`**) |
+| **Store interface** | **`StatusAccepted`**, outbox constants, **`AcceptEvent`**, **`OutboxStatus`** on **`Store`** |
+| **Postgres** | **`AcceptEvent`** — one TX: ledger **`accepted`** + outbox **`pending`**; **`OutboxStatus`**; **`TruncateLedger`** truncates **`outbox_events`** + **`processed_events`** (FK-safe) |
+| **Tests** | **`TestAcceptEvent_claimThenDuplicate`** — first accept → **`accepted`** + **`pending`**; duplicate → **`claimed=false`**, one row each |
+
+**Phase 4 implementation decisions:**
+
+| Decision | Choice |
+|----------|--------|
+| **M8 path** | **`ProcessEvent`** kept unchanged for existing tests; webhook switches to **`AcceptEvent`** in Phase 5 |
+| **Ledger in accept TX** | Insert straight to **`accepted`** (no **`processing`** hop — outbox insert is the only in-TX work) |
+| **Payload** | Caller marshals **`engine.Job`** JSON; store uses **`$3::jsonb`** (Postgres validates JSON) |
+| **Dedupe** | Same as M8: **`ON CONFLICT (event_id) DO NOTHING`** → **`claimed=false`**, not an error |
+| **Test reset** | **`TRUNCATE outbox_events, processed_events`** in one statement |
+
 ---
 
 #### Phase 5 — Wire webhook handler
@@ -243,6 +262,8 @@ KAFKA_GROUP_ID=stripe-webhook-worker
 3. Update duplicate handling for **`accepted`**.
 
 **Done gate:** **`go test ./cmd/api/...`** + integration duplicate test green.
+
+**Shipped:** Handler maps **`stripe.Event`** → **`engine.Job`** → **`AcceptEvent`**; duplicate branch handles **`accepted`**; **`fakeStore`** extended; integration tests assert ledger **`accepted`** + outbox **`pending`**.
 
 ---
 
@@ -296,13 +317,13 @@ KAFKA_GROUP_ID=stripe-webhook-worker
 
 | Existing | New / changed |
 |----------|----------------|
-| **`cmd/api/handlers.go`** | Accept + outbox in TX; **`accepted`** duplicate branch |
-| **`internal/store/`** | **`accepted`** status; outbox insert in TX; publisher queries |
+| **`cmd/api/handlers.go`** | Accept + outbox in TX; **`accepted`** duplicate branch *(Phase 5)* |
+| **`internal/store/`** | **`accepted`** status; outbox insert in TX; publisher queries *(Phase 4 done)* |
 | **`migrations/00001_...`** | Unchanged history |
-| **`docker-compose.yaml`** | **Redpanda** service |
+| **`docker-compose.yaml`** | **Redpanda** service *(M9a)* |
 | **`internal/engine/job.go`** | Possibly **`Job`** builder from id/type/payload without **`StripeEvent`** |
-| | **`migrations/00002_ledger_accepted_and_outbox.sql`** |
-| | **`cmd/worker/`** |
+| | **`migrations/00002_ledger_accepted_and_outbox.sql`** *(Phase 4)* |
+| | **`cmd/worker/`** *(M9a)* |
 | | **`cmd/publisher/`** |
 | | **`internal/kafka/`** — shared **`kgo`** client opts (brokers, TLS/SASL from env; M9b+ when publisher lands) |
 | **`README.md`** | Local M9 runbook |
@@ -314,9 +335,9 @@ KAFKA_GROUP_ID=stripe-webhook-worker
 - [ ] Phase 0: Three layers + **204 semantics** understood
 - [x] M9a Phase 1: Redpanda in Compose healthy
 - [x] M9a Phase 2: Worker consumes test message
-- [ ] M9a Phase 3: Job JSON spike end-to-end
-- [ ] M9b Phase 4: Migration + outbox in accept TX
-- [ ] M9b Phase 5: Webhook → **`accepted`** + outbox **pending**
+- [x] M9a Phase 3: Job JSON spike end-to-end *(skipped — `rpk` + worker integration test)*
+- [x] M9b Phase 4: Migration + outbox in accept TX
+- [x] M9b Phase 5: Webhook → **`accepted`** + outbox **pending**
 - [ ] M9b Phase 6: Publisher → Kafka → outbox **published**
 - [ ] M9b Phase 7: Worker logs **`stripe_job_consumed`**
 - [ ] M9b Phase 8: README local E2E + **`stripe listen`**

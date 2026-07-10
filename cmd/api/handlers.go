@@ -1,9 +1,9 @@
 package main
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
+	"integration-engine/internal/engine"
 	"io"
 	"net/http"
 
@@ -86,14 +86,31 @@ func (app *App) handleStripeWebhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	claimed, err := app.store.ProcessEvent(r.Context(), ev.ID, string(ev.Type), func(ctx context.Context) error {
-		log.Info(msgStripeEventAccepted,
+	var payload json.RawMessage
+	if ev.Data != nil {
+		payload = ev.Data.Raw
+	}
+	if len(payload) == 0 {
+		payload = json.RawMessage("null")
+	}
+
+	job := engine.Job{
+		StripeEventID: ev.ID,
+		EventType:     string(ev.Type),
+		Payload:       payload,
+	}
+	jobPayload, err := json.Marshal(job)
+	if err != nil {
+		log.Error(msgStripeEventProcessFailed,
 			"event_id", ev.ID,
 			"event_type", string(ev.Type),
-			"body_bytes", len(body),
+			"error", err.Error(),
 		)
-		return nil
-	})
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
+
+	claimed, err := app.store.AcceptEvent(r.Context(), ev.ID, string(ev.Type), jobPayload)
 	if err != nil {
 		log.Error(msgStripeEventProcessFailed,
 			"event_id", ev.ID,
@@ -104,6 +121,10 @@ func (app *App) handleStripeWebhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if claimed {
+		log.Info(msgStripeEventAccepted,
+			"event_id", ev.ID,
+			"event_type", string(ev.Type),
+		)
 		w.WriteHeader(http.StatusNoContent)
 		return
 	}
@@ -120,7 +141,7 @@ func (app *App) handleStripeWebhook(w http.ResponseWriter, r *http.Request) {
 	}
 
 	switch es.Status {
-	case store.StatusProcessed:
+	case store.StatusAccepted, store.StatusProcessed:
 		log.Info(msgStripeEventDuplicateSkipped,
 			"event_id", ev.ID,
 			"event_type", string(ev.Type),

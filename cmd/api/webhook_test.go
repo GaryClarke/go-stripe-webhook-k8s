@@ -20,9 +20,15 @@ import (
 
 const testWebhookSecret = "whsec_test"
 
+type fakeOutboxRow struct {
+	status  string
+	payload []byte
+}
+
 type fakeStore struct {
-	mu   sync.Mutex
-	rows map[string]string
+	mu     sync.Mutex
+	rows   map[string]string
+	outbox map[string]fakeOutboxRow
 }
 
 type pingFailStore struct {
@@ -34,7 +40,10 @@ func (f *pingFailStore) Ping(ctx context.Context) error {
 }
 
 func newFakeStore() *fakeStore {
-	return &fakeStore{rows: make(map[string]string)}
+	return &fakeStore{
+		rows:   make(map[string]string),
+		outbox: make(map[string]fakeOutboxRow),
+	}
 }
 
 func (f *fakeStore) ProcessEvent(ctx context.Context, eventID, eventType string, fn func(context.Context) error) (bool, error) {
@@ -50,6 +59,42 @@ func (f *fakeStore) ProcessEvent(ctx context.Context, eventID, eventType string,
 	}
 	f.rows[eventID] = store.StatusProcessed
 	return true, nil
+}
+
+func (f *fakeStore) AcceptEvent(
+	ctx context.Context,
+	eventID, eventType string,
+	jobPayload []byte,
+) (bool, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	if _, ok := f.rows[eventID]; ok {
+		return false, nil
+	}
+
+	f.rows[eventID] = store.StatusAccepted
+	f.outbox[eventID] = fakeOutboxRow{
+		status:  store.OutboxPending,
+		payload: append([]byte(nil), jobPayload...),
+	}
+	return true, nil
+}
+
+func (f *fakeStore) OutboxStatus(ctx context.Context, eventID string) (*store.OutboxStatus, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	ob, ok := f.outbox[eventID]
+	if !ok {
+		return &store.OutboxStatus{Found: false}, nil
+	}
+
+	return &store.OutboxStatus{
+		Found:   true,
+		Status:  ob.status,
+		Payload: append([]byte(nil), ob.payload...),
+	}, nil
 }
 
 func (f *fakeStore) Status(ctx context.Context, eventID string) (*store.EventStatus, error) {
@@ -86,7 +131,7 @@ func apiHandler() http.Handler {
 
 func webhookJSON(eventID string) string {
 	return fmt.Sprintf(
-		`{"id":%q,"type":"invoice.payment_succeeded","object":"event","api_version":%q}`,
+		`{"id":%q,"type":"invoice.payment_succeeded","object":"event","api_version":%q,"data":{"object":{}}}`,
 		eventID,
 		stripe.APIVersion,
 	)

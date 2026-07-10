@@ -44,6 +44,14 @@ func TestAPI_StripeWebhook_DuplicateDelivery_Integration(t *testing.T) {
 		t.Fatalf("first POST: status = %d, want %d", rec1.Code, http.StatusNoContent)
 	}
 
+	ob, err := p.OutboxStatus(ctx, eventID)
+	if err != nil {
+		t.Fatalf("OutboxStatus after first accept: %v", err)
+	}
+	if !ob.Found || ob.Status != store.OutboxPending {
+		t.Fatalf("outbox after first accept = %+v, want Found=true Status=pending", ob)
+	}
+
 	req2 := newSignedStripeWebhookRequest(body)
 	rec2 := httptest.NewRecorder()
 	handler.ServeHTTP(rec2, req2)
@@ -63,8 +71,8 @@ func TestAPI_StripeWebhook_DuplicateDelivery_Integration(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Status: %v", err)
 	}
-	if !es.Found || es.Status != store.StatusProcessed {
-		t.Fatalf("ledger status = %+v, want Found=true Status=processed", es)
+	if !es.Found || es.Status != store.StatusAccepted {
+		t.Fatalf("ledger status = %+v, want Found=true Status=accepted", es)
 	}
 }
 
@@ -116,7 +124,15 @@ func TestAPI_StripeWebhook_ConcurrentDuplicate_Integration(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Status: %v", err)
 	}
-	if !es.Found || es.Status != store.StatusProcessed {
-		t.Fatalf("ledger status = %+v, want Found=true Status=processed", es)
+	if !es.Found || es.Status != store.StatusAccepted {
+		t.Fatalf("ledger status = %+v, want Found=true Status=accepted", es)
+	}
+
+	ob, err := p.OutboxStatus(ctx, eventID)
+	if err != nil {
+		t.Fatalf("OutboxStatus after race: %v", err)
+	}
+	if !ob.Found || ob.Status != store.OutboxPending {
+		t.Fatalf("outbox after race = %+v, want Found=true Status=pending", ob)
 	}
 }
