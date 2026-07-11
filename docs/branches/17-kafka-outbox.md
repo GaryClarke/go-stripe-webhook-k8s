@@ -31,7 +31,9 @@
 | **Go Kafka client** | **[`twmb/franz-go`](https://github.com/twmb/franz-go)** (`kgo`) — not `segmentio/kafka-go`; one client library for worker + publisher; TLS/SASL/IAM via opts later without changing consume/publish loops |
 | **Consumer commit** | **Manual commit after successful handle** — `DisableAutoCommit` + `CommitRecords`; aligns with at-least-once and makes retry-on-failure explicit (M9a spike onward) |
 | **Rebalance safety** | **`BlockRebalanceOnPoll`** + **`AllowRebalance`** after batch commit — finish in-flight records before partition handoff |
-| **Publisher** | Separate process **`cmd/publisher`** (or named **`cmd/outbox-publisher`**) — poll unpublished outbox rows, publish, mark published |
+| **Publisher** | Separate process **`cmd/publisher`** — poll **`pending`** outbox rows, **`ProduceSync`** to Kafka, conditional mark **`published`** (see Phase 6) |
+| **Publisher instances (M9)** | **One** local process — no multi-publisher claim; **`FOR UPDATE SKIP LOCKED`** / **`publishing`** state deferred |
+| **Publisher delivery (M9)** | **At-least-once** — Kafka ack before mark **`published`**; mark failure → row stays **`pending`** → may duplicate on topic; worker idempotent (Phase 7) |
 | **Worker** | **`cmd/worker`** — consumer group, read topic, handle **`Job`** (M9: structured log) |
 | **M9 done gate** | **Local only:** **`stripe listen`** → API → outbox → publisher → Kafka → worker; README steps documented |
 | **ROSA / managed Kafka** | **Out of scope** for M9 done gate |
@@ -49,11 +51,10 @@
 ```text
 Stripe POST /webhooks/stripe
   -> verify signature (ConstructEvent)
-  -> BEGIN
-       INSERT processed_events (status=processing) ON CONFLICT DO NOTHING
+  -> AcceptEvent (one TX)
+       INSERT processed_events (status=accepted) ON CONFLICT DO NOTHING
        if inserted:
          INSERT outbox_events (pending, payload = Job JSON)
-         UPDATE processed_events SET status=accepted, processed_at=now()
        COMMIT
   -> if inserted + committed: log stripe_event_accepted -> 204
   -> if conflict: SELECT status
@@ -62,10 +63,13 @@ Stripe POST /webhooks/stripe
        failed      -> (later) retry policy
   -> DB error -> 500
 
-cmd/publisher (loop)
-  -> SELECT outbox WHERE status=pending (FOR UPDATE SKIP LOCKED or poll)
-  -> publish Job JSON to Kafka topic
-  -> UPDATE outbox SET status=published, published_at=now()
+cmd/publisher (single instance, poll loop — no DB TX during Kafka)
+  -> NextPendingOutbox (SELECT pending ORDER BY id LIMIT 1)
+  -> ProduceSync Job JSON to topic (record key = event_id)
+  -> MarkOutboxPublished (UPDATE … WHERE event_id AND status=pending)
+  -> on Kafka fail: log outbox_publish_failed; row stays pending
+  -> on Kafka ok, mark fail: log outbox_mark_published_failed; row stays pending (may duplicate on topic)
+  -> on both ok: log outbox_publish_succeeded
 
 cmd/worker (consumer group)
   -> read message from topic
@@ -125,8 +129,9 @@ Add service e.g. **`redpanda`** with Kafka API on host **`9092`** (document exac
 |-------|------|----------------|
 | **`stripe_event_accepted`** | Edge TX committed (**`accepted`** + outbox **pending**) | `request_id`, `event_id`, `event_type` |
 | **`stripe_event_duplicate_skipped`** | Ledger row exists, **`status = accepted`** | `request_id`, `event_id`, `event_type` |
-| **`outbox_publish_succeeded`** | Publisher marked row **published** | `event_id`, `topic`, `partition`, `offset` (if available) |
-| **`outbox_publish_failed`** | Publish or mark failed | `event_id`, `error` (sanitized) |
+| **`outbox_publish_succeeded`** | Kafka ack **and** row marked **`published`** | `event_id`, `topic`, `partition`, `offset` (if available) |
+| **`outbox_publish_failed`** | **`ProduceSync`** failed (broker/network) | `event_id`, `topic`, `error` (sanitized) |
+| **`outbox_mark_published_failed`** | Kafka ack succeeded but **`MarkOutboxPublished`** failed | `event_id`, `topic`, `error` (sanitized) — Kafka may already have the message |
 | **`stripe_job_consumed`** | Worker handled message (M9: log) | `event_id`, `event_type`, `offset` |
 
 Existing M8 messages stay; update duplicate branch from **`processed`** → **`accepted`**.
@@ -258,7 +263,7 @@ KAFKA_GROUP_ID=stripe-webhook-worker
 **Do:**
 
 1. After **`ConstructEvent`**, build **`engine.Job`** from **`stripe.Event`** in **`cmd/api`**.
-2. Replace trivial **`fn`** with outbox insert (inside store TX).
+2. Replace **`ProcessEvent`** with **`AcceptEvent`** (outbox insert inside store TX).
 3. Update duplicate handling for **`accepted`**.
 
 **Done gate:** **`go test ./cmd/api/...`** + integration duplicate test green.
@@ -271,11 +276,67 @@ KAFKA_GROUP_ID=stripe-webhook-worker
 
 **Do:**
 
-1. Poll or **`FOR UPDATE SKIP LOCKED`** on **`pending`** rows.
-2. Publish to Kafka; on success **`published`** + log **`outbox_publish_succeeded`**.
-3. On failure: log, leave **pending** (simple retry on next poll — no DLQ in M9).
+1. **`internal/store`** — **`NextPendingOutbox`**, **`MarkOutboxPublished`** (conditional UPDATE); integration tests.
+2. **`internal/config/publisher.go`** — **`LoadPublisher()`**: **`DATABASE_URL`**, **`KAFKA_BROKERS`**, **`KAFKA_TOPIC`**; optional poll interval.
+3. **`cmd/publisher/`** — poll loop, **`kgo`** producer (**`ProduceSync`**), JSON logs, graceful shutdown; Makefile **`publisher-run`**.
+4. Fakeable produce wrapper for unit tests (optional but recommended).
 
-**Done gate:** Accept event via HTTP → publisher → row **published**; message on topic.
+**Done gate:** Accept event via HTTP → publisher → row **`published`**; message on topic (worker consume in Phase 7/8).
+
+**Store contract (M9):**
+
+```go
+type OutboxRow struct {
+    EventID string
+    Payload []byte // engine.Job JSON from outbox_events.payload
+}
+
+// NextPendingOutbox returns nil, nil when no pending rows.
+NextPendingOutbox(ctx context.Context) (*OutboxRow, error)
+MarkOutboxPublished(ctx context.Context, eventID string) (updated bool, error)
+```
+
+**SQL (mark):**
+
+```sql
+UPDATE outbox_events
+SET status = 'published', published_at = now()
+WHERE event_id = $1 AND status = 'pending';
+```
+
+Inspect **`RowsAffected() == 1`** for **`updated`**.
+
+**Failure semantics (M9):**
+
+| Step | Outcome |
+|------|---------|
+| Kafka fails | Row stays **`pending`**; retry next poll |
+| Kafka ok, mark fails | Row stays **`pending`**; retry may **duplicate** on topic |
+| Both ok | Row **`published`** |
+
+**Never** mark **`published`** before Kafka acknowledges. **Never** hold a DB transaction open during **`ProduceSync`**.
+
+**Phase 6 implementation decisions:**
+
+| Decision | Choice |
+|----------|--------|
+| **Publisher instances** | **One** local process (document in README when Phase 8 lands) |
+| **Claim / lock** | **None** — no **`FOR UPDATE SKIP LOCKED`**; no **`publishing`** status in M9 |
+| **Read pending** | **`ORDER BY id LIMIT 1`** — no TX during Kafka |
+| **Mark published** | Conditional UPDATE **`WHERE status = 'pending'`** |
+| **Kafka key** | **`event_id`** (partition stickiness; not exactly-once) |
+| **Head-of-line blocking** | First failing row blocks later **`pending`** rows — **accepted for M9**; defer **`attempt_count`**, backoff, **`failed`**, skip-to-next |
+| **Multi-publisher** | **Deferred** — post-M9: **`publishing`** + **`claimed_at`** + stale reclaim |
+| **DLQ / backoff** | **Out of scope** M9 — simple poll retry only |
+
+**Implementation order:**
+
+1. Lock claim model (this section) ✓
+2. Store methods + integration tests
+3. **`LoadPublisher()`**
+4. Fakeable **`ProduceSync`** wrapper
+5. Poll loop + logs + shutdown
+6. Local done-gate proof (HTTP → published → topic)
 
 ---
 
@@ -306,6 +367,7 @@ KAFKA_GROUP_ID=stripe-webhook-worker
 - ROSA / ECR deploy of publisher or worker
 - Managed Kafka (MSK, Redpanda Cloud)
 - Dead-letter queue, exponential backoff, exactly-once semantics
+- **Multi-publisher outbox claims** (`publishing` status, stale reclaim) — M9 runs **one** publisher
 - Downstream **`processed`** completion table (consumer business outcome)
 - Stale **`processing`** / **`failed`** recovery workflows
 - Outbox multi-row per event, saga, or cross-service transactions
@@ -318,7 +380,7 @@ KAFKA_GROUP_ID=stripe-webhook-worker
 | Existing | New / changed |
 |----------|----------------|
 | **`cmd/api/handlers.go`** | Accept + outbox in TX; **`accepted`** duplicate branch *(Phase 5)* |
-| **`internal/store/`** | **`accepted`** status; outbox insert in TX; publisher queries *(Phase 4 done)* |
+| **`internal/store/`** | **`AcceptEvent`** *(Phase 4–5)*; **`NextPendingOutbox`**, **`MarkOutboxPublished`** *(Phase 6)* |
 | **`migrations/00001_...`** | Unchanged history |
 | **`docker-compose.yaml`** | **Redpanda** service *(M9a)* |
 | **`internal/engine/job.go`** | Possibly **`Job`** builder from id/type/payload without **`StripeEvent`** |
@@ -360,7 +422,7 @@ Work **after** M9 **done gate** (local E2E documented). **Do not start these unt
 
 | Step | Track | What | Why this order |
 |------|-------|------|----------------|
-| **1** | **App hardening** | Consumer completion table; DLQ / retry policy for outbox **`failed`**; stale **`processing`** reclaim (if needed) | Finish **behaviour** locally before new infra |
+| **1** | **App hardening** | Consumer completion table; DLQ / retry policy for outbox **`failed`**; **multi-publisher claims** (`publishing`, `claimed_at`, stale reclaim); **`attempt_count`** / backoff for head-of-line; stale **`processing`** reclaim (if needed) | Finish **behaviour** locally before new infra |
 | **2** | **K8s / ROSA** | **`k8s/`** Deployments (or separate overlays) for **`cmd/publisher`** + **`cmd/worker`**; Secrets for **`KAFKA_*`** + publisher **`DATABASE_URL`**; extend **`deploy-rosa.yaml`** or sibling workflow (ECR tags for extra binaries) | Run async pipeline on cluster **before** managed broker Terraform |
 | **3** | **Broker choice** | Decide **MSK** vs **Redpanda Cloud** vs in-VPC self-managed; document in **`docs/`** | Informs Terraform and **`KAFKA_BROKERS`** in prod |
 | **4** | **Terraform** | e.g. **`infra/terraform/kafka/`** (MSK cluster, SG, bootstrap brokers output) — separate state key like RDS | Broker reachable from ROSA VPC workers |
@@ -395,6 +457,7 @@ Work **after** M9 **done gate** (local E2E documented). **Do not start these unt
 
 - **Consumer completion table** — downstream **`processed`** / **`failed`** separate from ingestion **`accepted`** ledger.
 - **Outbox **`failed`** rows** — retry counter, DLQ topic, or manual replay (pick one when needed).
+- **Multi-publisher** — durable claim (`publishing`), stale **`claimed_at`** recovery; do not use **`FOR UPDATE SKIP LOCKED`** without a persisted claim state.
 
 **Docs / cleanup (anytime after M9)**
 
