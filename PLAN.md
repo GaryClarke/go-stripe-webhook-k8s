@@ -226,7 +226,7 @@ In-memory dedupe is acceptable only as a **demonstration** with explicit “sing
 
 **Milestone 8 status:** **Complete on `main`**. Shipped and verified: Postgres ledger, Goose migrations, **`/readyz`** DB ping, Terraform **RDS**, in-cluster migrate **Job**, **`replicas: 2`** on ROSA; duplicate **`event_id`** → one row, **204**, **`stripe_event_duplicate_skipped`**. See **[docs/branches/16-idempotency-postgres.md](docs/branches/16-idempotency-postgres.md)**. **Next:** **Milestone 9** (Kafka).
 
-**Milestone 9 status:** **In progress** on branch **`17-kafka-outbox`**. Decisions locked: **Redpanda** locally, **transactional outbox**, ledger status **`accepted`** (Option A), **204** = durably accepted for async processing. See **[docs/branches/17-kafka-outbox.md](docs/branches/17-kafka-outbox.md)**.
+**Milestone 9 status:** **Complete** on branch **`17-kafka-outbox`**. Shipped: **Redpanda** in Compose, transactional **outbox**, **`cmd/publisher`**, **`cmd/worker`**, ledger **`accepted`**, local E2E documented in **README**. See **[docs/branches/17-kafka-outbox.md](docs/branches/17-kafka-outbox.md)**. **Next:** post-M9 follow-ups in that doc (consumer completion, ROSA deploy of async binaries, managed Kafka).
 
 ---
 

@@ -400,9 +400,9 @@ Inspect **`RowsAffected() == 1`** for **`updated`**.
 - [x] M9a Phase 3: Job JSON spike end-to-end *(skipped — `rpk` + worker integration test)*
 - [x] M9b Phase 4: Migration + outbox in accept TX
 - [x] M9b Phase 5: Webhook → **`accepted`** + outbox **pending**
-- [ ] M9b Phase 6: Publisher → Kafka → outbox **published**
-- [ ] M9b Phase 7: Worker logs **`stripe_job_consumed`**
-- [ ] M9b Phase 8: README local E2E + **`stripe listen`**
+- [x] M9b Phase 6: Publisher → Kafka → outbox **published**
+- [x] M9b Phase 7: Worker logs **`stripe_job_consumed`**
+- [x] M9b Phase 8: README local E2E + **`stripe listen`**
 
 ---
 
