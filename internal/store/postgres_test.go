@@ -183,6 +183,67 @@ func TestAcceptEvent_claimThenDuplicate(t *testing.T) {
 	}
 }
 
+func TestOutboxPublisher_nextThenMarkPublished(t *testing.T) {
+	p := testPostgres(t)
+	resetLedger(t, p)
+	ctx := context.Background()
+
+	const (
+		eventID   = "evt_outbox_publish"
+		eventType = "invoice.payment_succeeded"
+	)
+	jobPayload := []byte(`{"stripe_event_id":"evt_outbox_publish","event_type":"invoice.payment_succeeded","payload":{}}`)
+
+	claimed, err := p.AcceptEvent(ctx, eventID, eventType, jobPayload)
+	if err != nil || !claimed {
+		t.Fatalf("AcceptEvent: claimed=%v err=%v", claimed, err)
+	}
+
+	row, err := p.NextPendingOutbox(ctx)
+	if err != nil {
+		t.Fatalf("NextPendingOutbox: %v", err)
+	}
+	if row == nil {
+		t.Fatal("NextPendingOutbox: want row, got nil")
+	}
+	if row.EventID != eventID {
+		t.Fatalf("EventID = %q, want %q", row.EventID, eventID)
+	}
+
+	updated, err := p.MarkOutboxPublished(ctx, eventID)
+	if err != nil {
+		t.Fatalf("MarkOutboxPublished: %v", err)
+	}
+	if !updated {
+		t.Fatal("MarkOutboxPublished: want updated=true")
+	}
+
+	ob, err := p.OutboxStatus(ctx, eventID)
+	if err != nil {
+		t.Fatalf("OutboxStatus: %v", err)
+	}
+	if !ob.Found || ob.Status != OutboxPublished {
+		t.Fatalf("outbox = %+v, want published", ob)
+	}
+
+	row, err = p.NextPendingOutbox(ctx)
+	if err != nil {
+		t.Fatalf("NextPendingOutbox after mark: %v", err)
+	}
+	if row != nil {
+		t.Fatalf("NextPendingOutbox after mark = %+v, want nil", row)
+	}
+
+	// Idempotent mark: already published.
+	updated, err = p.MarkOutboxPublished(ctx, eventID)
+	if err != nil {
+		t.Fatalf("second MarkOutboxPublished: %v", err)
+	}
+	if updated {
+		t.Fatal("second MarkOutboxPublished: want updated=false")
+	}
+}
+
 func TestStatus_notFound(t *testing.T) {
 	p := testPostgres(t)
 	resetLedger(t, p)

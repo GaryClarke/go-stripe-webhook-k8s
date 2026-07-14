@@ -30,6 +30,12 @@ type OutboxStatus struct {
 	Payload []byte
 }
 
+// OutboxRow is one pending outbox entry for the publisher to deliver.
+type OutboxRow struct {
+	EventID string
+	Payload []byte
+}
+
 // Store persists webhook idempotency state in Postgres.
 // Implementations must be safe for concurrent use across multiple Pods.
 type Store interface {
@@ -48,6 +54,13 @@ type Store interface {
 
 	// OutboxStatus returns outbox row for eventID. Found=false when no outbox row exists.
 	OutboxStatus(ctx context.Context, eventID string) (*OutboxStatus, error)
+
+	// NextPendingOutbox returns the oldest pending row, or nil when none.
+	NextPendingOutbox(ctx context.Context) (*OutboxRow, error)
+
+	// MarkOutboxPublished sets status=published when still pending.
+	// updated=false when no pending row matched (already published or missing).
+	MarkOutboxPublished(ctx context.Context, eventID string) (updated bool, err error)
 
 	// Ping checks database connectivity (for /readyz).
 	Ping(ctx context.Context) error

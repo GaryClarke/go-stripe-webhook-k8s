@@ -111,6 +111,14 @@ func (f *fakeStore) Ping(ctx context.Context) error {
 	return nil
 }
 
+func (f *fakeStore) NextPendingOutbox(ctx context.Context) (*store.OutboxRow, error) {
+	return nil, nil
+}
+
+func (f *fakeStore) MarkOutboxPublished(ctx context.Context, eventID string) (bool, error) {
+	return false, nil
+}
+
 // newAPIHandler wires the same stack as main but lets tests inject the store
 // and capture JSON logs from the buffer.
 func newAPIHandler(st store.Store) (http.Handler, *bytes.Buffer) {

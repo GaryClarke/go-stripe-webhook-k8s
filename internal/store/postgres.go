@@ -177,6 +177,43 @@ func (p *Postgres) OutboxStatus(ctx context.Context, eventID string) (*OutboxSta
 	}, nil
 }
 
+func (p *Postgres) NextPendingOutbox(ctx context.Context) (*OutboxRow, error) {
+	var eventID string
+	var payload []byte
+	err := p.db.QueryRowContext(ctx, `
+		SELECT event_id, payload
+		FROM outbox_events
+		WHERE status = $1
+		ORDER BY id
+		LIMIT 1`, OutboxPending).Scan(&eventID, &payload)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("store: select next pending outbox: %w", err)
+	}
+	return &OutboxRow{
+		EventID: eventID,
+		Payload: append([]byte(nil), payload...),
+	}, nil
+}
+
+func (p *Postgres) MarkOutboxPublished(ctx context.Context, eventID string) (bool, error) {
+	res, err := p.db.ExecContext(ctx, `
+		UPDATE outbox_events
+    	SET status = $1, published_at = now()
+    	WHERE event_id = $2 AND status = $3
+    	`, OutboxPublished, eventID, OutboxPending)
+	if err != nil {
+		return false, fmt.Errorf("store: mark outbox published: %w", err)
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return false, fmt.Errorf("store: rows affected: %w", err)
+	}
+	return n == 1, nil
+}
+
 // TruncateLedger removes all rows from processed_events and outbox_events (integration tests).
 func (p *Postgres) TruncateLedger(ctx context.Context) error {
 	// Both tables in one statement: outbox_events FK references processed_events.

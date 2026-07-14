@@ -36,13 +36,15 @@ fmt:
 
 .PHONY: build test test-integration lint tidy fmt lab-status lab-ecr-refresh lab-on lab-off \
 	db-up db-down db-logs db-check db-migrate db-migrate-test \
-	kafka-up kafka-down kafka-logs kafka-check kafka-smoke worker-run
+	kafka-up kafka-down kafka-logs kafka-check kafka-smoke worker-run publisher-run
 
 # --- Local Postgres (M8 Phase 1) — see docs/branches/16-idempotency-postgres.md ---
 # Dev and test are separate DATABASE names on the same Compose service (port 5433).
 
 DATABASE_URL_DEV ?= postgres://webhook:webhook@localhost:5433/stripe_webhook_dev?sslmode=disable
 DATABASE_URL_TEST ?= postgres://webhook:webhook@localhost:5433/stripe_webhook_test?sslmode=disable
+# Publisher (and manual go run) default to dev DB when DATABASE_URL is unset.
+DATABASE_URL ?= $(DATABASE_URL_DEV)
 
 # Start local Compose stack (Postgres + Redpanda + Console). Reuses volumes unless db-down -v.
 db-up:
@@ -99,3 +101,8 @@ kafka-smoke:
 
 worker-run:
 	KAFKA_BROKERS=$(KAFKA_BROKERS) KAFKA_TOPIC=$(KAFKA_TOPIC) KAFKA_GROUP_ID=$(KAFKA_GROUP_ID) go run ./cmd/worker
+
+publisher-run:
+	DATABASE_URL=$(DATABASE_URL) \
+	KAFKA_BROKERS=$(KAFKA_BROKERS) KAFKA_TOPIC=$(KAFKA_TOPIC) \
+	go run ./cmd/publisher
