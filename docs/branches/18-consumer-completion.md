@@ -28,6 +28,7 @@
 | **Downstream IO (M10)** | **Stub** — e.g. log **`stripe_job_handled`** or no-op success; real HTTP to third party deferred to M11+ |
 | **Worker DB** | Worker needs **`DATABASE_URL`** (same dev Postgres as API/publisher) |
 | **Failed handling** | Persist **`failed`** + sanitized **`error`**; **do not** commit offset (Kafka redelivers) — M10 minimum |
+| **`processing` in-flight** | **Retry** — if row already **`processing`** (crash mid-handle), proceed with handle again; bump **`attempt_count`** on reclaim; no stale skip in M10 |
 | **Never log** | **`DATABASE_URL`**, raw **`payload`**, secrets |
 
 **Why a third table:** **`processed_events`** answers “accepted from Stripe?”; **`outbox_events`** answers “published to Kafka?”; **`consumer_completions`** answers “did consumer X finish?” Mixing those stages into one row does not scale when multiple consumers exist.
@@ -47,9 +48,9 @@ Layer summary (after M10):
 ```text
 cmd/worker (per message)
   -> unmarshal engine.Job
-  -> BeginCompletion / ClaimCompletion (INSERT processing ON CONFLICT ...)
+  -> ClaimConsumerCompletion (INSERT processing ON CONFLICT ...)
        if already processed: log stripe_job_duplicate_skipped -> commit offset
-       if processing (in-flight): (M10: treat as retry or skip — document choice)
+       if processing (in-flight): retry handle (M10 — bump attempt_count, no skip)
   -> handleJob (M10: stub — log stripe_job_handled)
   -> MarkCompletionProcessed (UPDATE ... WHERE status = processing)
        on error: MarkCompletionFailed; return false (no offset commit)
@@ -99,6 +100,8 @@ CREATE INDEX consumer_completions_status_idx ON consumer_completions (status);
 
 **Done gate:** Four-layer diagram understood; third table rationale clear.
 
+**Locked:** **`processing`** in-flight → **retry** (not skip); see Decisions table.
+
 ---
 
 ### Phase 1 — Migration + store
@@ -107,7 +110,7 @@ CREATE INDEX consumer_completions_status_idx ON consumer_completions (status);
 
 1. Migration **`00003_consumer_completions.sql`**
 2. Store constants + **`ConsumerCompletionRow`**
-3. **`ClaimConsumerCompletion(ctx, eventID, consumerName, eventType)`** — insert **`processing`** or return existing status
+3. **`ClaimConsumerCompletion(ctx, eventID, consumerName, eventType)`** — insert **`processing`**; on conflict return existing status; if existing **`processing`**, increment **`attempt_count`** and allow retry (return claimable)
 4. **`MarkConsumerProcessed(ctx, eventID, consumerName)`** — conditional update from **`processing`**
 5. **`MarkConsumerFailed(ctx, eventID, consumerName, errMsg)`** — conditional update from **`processing`**
 6. Integration tests: claim → processed; duplicate claim → already processed; failed path
@@ -173,7 +176,7 @@ stripe listen --latest -> API -> outbox -> publisher -> Kafka -> worker -> consu
 
 ## Verify checklist
 
-- [ ] Phase 0: Third table + offset-after-DB understood
+- [x] Phase 0: Third table + offset-after-DB understood; **`processing`** → retry locked
 - [ ] Phase 1: Migration + store methods + integration tests
 - [ ] Phase 2: Worker **`DATABASE_URL`** + store wired
 - [ ] Phase 3: Idempotent handle + commit discipline
