@@ -4,7 +4,7 @@
 
 **Git branch:** `17-kafka-outbox`
 
-**Status:** **In progress** — M9a complete; **M9b Phase 5 complete** (webhook → `AcceptEvent`); Phase 6 (publisher) next.
+**Status:** **Complete** — M9a + M9b Phases 4–8 done; merged to **`main`**.
 
 **Prerequisite:** **Milestone 8** complete on **`main`** (**`processed_events`**, Goose, **`/readyz`**, ROSA + RDS proof optional for M9 done gate).
 

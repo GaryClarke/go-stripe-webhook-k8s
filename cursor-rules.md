@@ -19,7 +19,8 @@ Use this file as guardrails for AI and humans working in this repo. Keep it upda
 ## Architecture
 
 - **Entry point:** **`cmd/api`** HTTP server on Kubernetes (local binary and container). Shared logic lives in **`internal/`**; **`cmd/`** only wires and invokes.
-- **Events:** A later milestone introduces **Kafka** between ingestion and processing; this repo does not ship SQS or an in-process queue package until that work lands.
+- **Active track (2026):** **Local Compose** (Postgres + Redpanda) is the default for new milestones. **ROSA lab** and **AWS** (ECR push to cluster, RDS, MSK) are **paused** (cost + account)—do not propose **`start work`**, **`make lab-on`**, or new cloud Terraform as the default next step unless the user explicitly resumes the cloud track. See **[PLAN.md](PLAN.md)** § Active learning track.
+- **Events:** **Kafka** (Redpanda locally) decouples ingestion from processing; see Milestones 9–10.
 - **Stripe:** Support the event shapes we document (v1: **`invoice.payment_succeeded`**, **`invoice.payment_failed`**). Validate and normalise at the webhook boundary; downstream consumers stay agnostic of Stripe where possible.
 
 ## Commits and branches

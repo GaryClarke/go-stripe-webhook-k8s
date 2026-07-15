@@ -42,6 +42,16 @@ Each milestone lists **what to learn**, **what changes in the repo**, and **how 
 
 **Branch discipline:** Use numbered git branches (e.g. `1-add-livez-and-readyz`) and add a short write-up under **[docs/branches/](docs/branches/README.md)** when useful. **Cursor / AI workflow** (chat shorthands, merge flow): single source of truth is **[cursor-rules.md](cursor-rules.md)**—do not duplicate those rules in this file.
 
+## Active learning track (2026)
+
+**Default path: local Compose only.** Postgres + Redpanda on the laptop; **`cmd/api`**, **`cmd/publisher`**, **`cmd/worker`**; **`stripe listen`** E2E. No cloud spend required for the current milestone sequence.
+
+**Paused (not abandoned):** **ROSA lab** (Milestone 7 cost), **AWS** account work (open case), and post-M9 **cloud infra** (ECR push to prod paths, **RDS** in AWS, **MSK** / managed Kafka, **`deploy-rosa.yaml`** extensions for publisher/worker). Existing **`k8s/`**, **`openshift/`**, **`infra/terraform/`**, and ROSA runbooks remain **reference material**—resume when cost and AWS access allow.
+
+**Do not suggest as the default next step:** **`make lab-on`**, new ROSA deploy work, MSK Terraform, or multi-env AWS promotion unless the user explicitly resumes the cloud track.
+
+**Current focus:** **Milestone 10** — consumer completion and idempotent worker (local only). See **[docs/branches/18-consumer-completion.md](docs/branches/18-consumer-completion.md)**.
+
 ---
 
 ## Milestone 1: HTTP service (local)
@@ -226,7 +236,7 @@ In-memory dedupe is acceptable only as a **demonstration** with explicit “sing
 
 **Milestone 8 status:** **Complete on `main`**. Shipped and verified: Postgres ledger, Goose migrations, **`/readyz`** DB ping, Terraform **RDS**, in-cluster migrate **Job**, **`replicas: 2`** on ROSA; duplicate **`event_id`** → one row, **204**, **`stripe_event_duplicate_skipped`**. See **[docs/branches/16-idempotency-postgres.md](docs/branches/16-idempotency-postgres.md)**. **Next:** **Milestone 9** (Kafka).
 
-**Milestone 9 status:** **Complete** on branch **`17-kafka-outbox`**. Shipped: **Redpanda** in Compose, transactional **outbox**, **`cmd/publisher`**, **`cmd/worker`**, ledger **`accepted`**, local E2E documented in **README**. See **[docs/branches/17-kafka-outbox.md](docs/branches/17-kafka-outbox.md)**. **Next:** post-M9 follow-ups in that doc (consumer completion, ROSA deploy of async binaries, managed Kafka).
+**Milestone 9 status:** **Complete on `main`**. Shipped: **Redpanda** in Compose, transactional **outbox**, **`cmd/publisher`**, **`cmd/worker`**, ledger **`accepted`**, local E2E documented in **README**. See **[docs/branches/17-kafka-outbox.md](docs/branches/17-kafka-outbox.md)**. **Next:** **Milestone 10** (consumer completion, local only). Cloud follow-ups (ROSA async deploy, MSK) **paused** — see **Active learning track** above.
 
 ---
 
@@ -240,9 +250,29 @@ In-memory dedupe is acceptable only as a **demonstration** with explicit “sing
 
 You do not need a full cluster-distributed Kafka on day one; **Redpanda** in Compose is the chosen local story.
 
-**Production broker + cluster deploy are deferred until after M9 done gate.** Same Go binaries; differences are **env + infra only** (see **[docs/branches/17-kafka-outbox.md](docs/branches/17-kafka-outbox.md)** — **Follow-ups (post-M9, ordered)**).
+**Production broker + cluster deploy are deferred** (cloud track paused — see **PLAN.md** § Active learning track). Same Go binaries; differences are **env + infra only** when cloud resumes (see **[docs/branches/17-kafka-outbox.md](docs/branches/17-kafka-outbox.md)** — **Follow-ups (post-M9, ordered)**).
 
 **Branch (suggested):** **`17-kafka-outbox`** — see **[docs/branches/17-kafka-outbox.md](docs/branches/17-kafka-outbox.md)**.
+
+---
+
+## Milestone 10: Consumer completion (local)
+
+| | |
+|--|--|
+| **Learn** | Consumer-side idempotency; **offset commit after durable business record**; separating **transport** (Kafka) from **processing** (downstream outcome). |
+| **Build** | Third table (**`consumer_completions`** or similar) for **`processed`** / **`failed`** per **`(event_id, consumer_name)`**; **`cmd/worker`** writes completion before **`CommitRecords`**; duplicate Kafka delivery → no-op + **`stripe_job_duplicate_skipped`**. Optional: stub downstream handler (log or mock HTTP). **No ROSA, no AWS, no MSK.** Branch doc: **[docs/branches/18-consumer-completion.md](docs/branches/18-consumer-completion.md)**. |
+| **Done when** | Local E2E: webhook → outbox → Kafka → worker → **completion row in Postgres**; redelivered message does not double-process; README updated. |
+
+**Prerequisite:** **Milestone 9** complete on **`main`**.
+
+**Explicitly out of scope for M10:** ROSA/K8s deploy of worker, managed Kafka, real third-party API integration (can be a later milestone), DLQ topic, multi-consumer fan-out.
+
+**Branch (suggested):** **`18-consumer-completion`** — see **[docs/branches/18-consumer-completion.md](docs/branches/18-consumer-completion.md)**.
+
+**Milestone 10 status:** **Not started** — branch doc locked; implementation next.
+
+**Paused cloud work (when AWS/ROSA resume):** post-M9 steps 2–7 in **[docs/branches/17-kafka-outbox.md](docs/branches/17-kafka-outbox.md)** (K8s publisher/worker, MSK, TLS/SASL, secrets automation).
 
 ---
 
