@@ -119,6 +119,22 @@ func (f *fakeStore) MarkOutboxPublished(ctx context.Context, eventID string) (bo
 	return false, nil
 }
 
+func (f *fakeStore) ClaimConsumerCompletion(ctx context.Context, eventID, consumerName, eventType string) (*store.CompletionClaim, error) {
+	return &store.CompletionClaim{Action: store.CompletionClaimNew, AttemptCount: 1}, nil
+}
+
+func (f *fakeStore) MarkConsumerProcessed(ctx context.Context, eventID, consumerName string) (bool, error) {
+	return true, nil
+}
+
+func (f *fakeStore) MarkConsumerFailed(ctx context.Context, eventID, consumerName, errMsg string) (bool, error) {
+	return true, nil
+}
+
+func (f *fakeStore) CompletionStatus(ctx context.Context, eventID, consumerName string) (*store.CompletionStatus, error) {
+	return &store.CompletionStatus{Found: false}, nil
+}
+
 // newAPIHandler wires the same stack as main but lets tests inject the store
 // and capture JSON logs from the buffer.
 func newAPIHandler(st store.Store) (http.Handler, *bytes.Buffer) {

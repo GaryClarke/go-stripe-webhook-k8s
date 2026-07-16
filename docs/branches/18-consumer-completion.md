@@ -29,6 +29,10 @@
 | **Worker DB** | Worker needs **`DATABASE_URL`** (same dev Postgres as API/publisher) |
 | **Failed handling** | Persist **`failed`** + sanitized **`error`**; **do not** commit offset (Kafka redelivers) — M10 minimum |
 | **`processing` in-flight** | **Retry** — if row already **`processing`** (crash mid-handle), proceed with handle again; bump **`attempt_count`** on reclaim; no stale skip in M10 |
+| **`failed` on reclaim** | **Retry from failed** — reset to **`processing`**, bump **`attempt_count`**, clear **`error`** → action **`retry_from_failed`** |
+| **`ClaimConsumerCompletion` return** | **`*CompletionClaim`** with **`CompletionClaimAction`** enum (`new`, `retry`, `retry_from_failed`, `already_processed`) |
+| **`CompletionStatus`** | On **`Store`** for **integration tests**; **not** used on worker hot path (claim + mark are enough) |
+| **`store.go` layout** | Group by **domain** (ledger consts + types, outbox, completion, then interfaces) — not strict “all consts first” |
 | **Never log** | **`DATABASE_URL`**, raw **`payload`**, secrets |
 
 **Why a third table:** **`processed_events`** answers “accepted from Stripe?”; **`outbox_events`** answers “published to Kafka?”; **`consumer_completions`** answers “did consumer X finish?” Mixing those stages into one row does not scale when multiple consumers exist.
@@ -119,6 +123,58 @@ CREATE INDEX consumer_completions_status_idx ON consumer_completions (status);
 
 ---
 
+### Phase 1b — Store interface segregation (after Phase 1 PR)
+
+**When:** Right after Phase 1 store methods + integration tests merge (or commit on same branch before Phase 2). **No SQL changes** — refactor types and wiring only.
+
+**Why:** **`Store`** is a wide facade (~11 methods). **`fakeStore`** in **`cmd/api`** must stub outbox and completion methods the API never calls. **`cmd/publisher`** already uses **`*store.Postgres`** directly, not **`Store`**.
+
+**Goal:** Interface segregation at **call sites**; **`*Postgres`** still one struct implementing everything.
+
+**Do:**
+
+1. Split **`internal/store/store.go`** into embedded interfaces:
+
+| Interface | Methods | Primary consumer |
+|-----------|---------|------------------|
+| **`LedgerStore`** | **`AcceptEvent`**, **`Status`** | **`cmd/api`** |
+| **`LegacyLedgerStore`** (optional) | **`ProcessEvent`** | M8 tests only — drop from composite when unused |
+| **`OutboxStore`** | **`NextPendingOutbox`**, **`MarkOutboxPublished`** | **`cmd/publisher`** |
+| **`OutboxReader`** (optional) | **`OutboxStatus`** | integration tests |
+| **`ConsumerCompletionStore`** | **`ClaimConsumerCompletion`**, **`MarkConsumerProcessed`**, **`MarkConsumerFailed`** | **`cmd/worker`** |
+| **`CompletionReader`** (optional) | **`CompletionStatus`** | integration tests |
+| **`Pinger`** | **`Ping`** | **`cmd/api`** **`/readyz`** |
+
+2. **Composite facade** (for **`main`** wiring and full integration tests):
+
+```go
+type Store interface {
+    LedgerStore
+    OutboxStore
+    ConsumerCompletionStore
+    Pinger
+    // optional: OutboxReader, CompletionReader, LegacyLedgerStore
+}
+```
+
+3. **Narrow dependencies at call sites:**
+
+| Package | Depend on |
+|---------|-----------|
+| **`cmd/api/app.go`** | **`LedgerStore` + `Pinger`** (local interface embedding those two, or named **`IngestStore`**) |
+| **`cmd/publisher`** | **`OutboxStore`** via interface (replace raw **`*Postgres`** type if desired) |
+| **`cmd/worker`** | **`ConsumerCompletionStore`** only (Phase 2) |
+
+4. **Shrink **`fakeStore`**** — implement only **`LedgerStore` + `Pinger`** for API unit tests; use **`store.Postgres`** or a test helper for cross-layer integration tests.
+
+5. **File layout in **`store.go`** (or split **`store/interfaces.go`** if file grows): group by domain — ledger consts + **`EventStatus`**, outbox consts + outbox types, completion consts + **`CompletionClaim`** + **`CompletionStatus`**, then interface blocks.
+
+**Done gate:** **`go test ./...`** green; **`fakeStore`** no longer stubs completion/outbox publish methods unless a test needs them.
+
+**Out of scope for 1b:** new behaviour, migration changes, worker wiring (that is Phase 2).
+
+---
+
 ### Phase 2 — Worker config + wiring
 
 **Do:**
@@ -178,6 +234,7 @@ stripe listen --latest -> API -> outbox -> publisher -> Kafka -> worker -> consu
 
 - [x] Phase 0: Third table + offset-after-DB understood; **`processing`** → retry locked
 - [ ] Phase 1: Migration + store methods + integration tests
+- [ ] Phase 1b: Store interface segregation (optional refactor, no SQL)
 - [ ] Phase 2: Worker **`DATABASE_URL`** + store wired
 - [ ] Phase 3: Idempotent handle + commit discipline
 - [ ] Phase 4: README + PLAN M10 complete
@@ -213,7 +270,7 @@ stripe listen --latest -> API -> outbox -> publisher -> Kafka -> worker -> consu
 |----------|----------------|
 | **`cmd/worker/main.go`** | DB store, completion before commit |
 | **`internal/config/worker.go`** | **`DATABASE_URL`** |
-| **`internal/store/`** | Claim / mark completion methods |
+| **`internal/store/`** | Claim / mark completion methods; Phase 1b interface split |
 | **`Makefile`** | **`worker-run`** **`DATABASE_URL`** |
 | **`README.md`** | M10 E2E + four-layer DB check |
 | | **`migrations/00003_consumer_completions.sql`** |

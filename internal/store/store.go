@@ -7,7 +7,7 @@ const (
 	StatusProcessing = "processing"
 	StatusAccepted   = "accepted" // M9: durably accepted for async processing
 	StatusProcessed  = "processed"
-	StatusFailed     = "failed"
+	StatusFailed     = "failed" // reserved; outbox failed retry deferred post-M9
 )
 
 // Outbox status values for outbox_events.status (must match DB CHECK constraint).
@@ -16,6 +16,27 @@ const (
 	OutboxPublished = "published"
 	OutboxFailed    = "failed"
 )
+
+// Completion status constants (separate names from ledger)
+const (
+	CompletionProcessing = "processing"
+	CompletionProcessed  = "processed"
+	CompletionFailed     = "failed"
+)
+
+type CompletionClaimAction string
+
+const (
+	CompletionClaimNew              CompletionClaimAction = "new"
+	CompletionClaimRetry            CompletionClaimAction = "retry"
+	CompletionClaimRetryFromFailed  CompletionClaimAction = "retry_from_failed"
+	CompletionClaimAlreadyProcessed CompletionClaimAction = "already_processed"
+)
+
+type CompletionClaim struct {
+	Action       CompletionClaimAction
+	AttemptCount int
+}
 
 // EventStatus is the ledger summary for one Stripe event.id.
 type EventStatus struct {
@@ -28,6 +49,13 @@ type OutboxStatus struct {
 	Found   bool
 	Status  string
 	Payload []byte
+}
+
+type CompletionStatus struct {
+	Found        bool
+	Status       string
+	AttemptCount int
+	Error        string
 }
 
 // OutboxRow is one pending outbox entry for the publisher to deliver.
@@ -61,6 +89,14 @@ type Store interface {
 	// MarkOutboxPublished sets status=published when still pending.
 	// updated=false when no pending row matched (already published or missing).
 	MarkOutboxPublished(ctx context.Context, eventID string) (updated bool, err error)
+
+	ClaimConsumerCompletion(ctx context.Context, eventID, consumerName, eventType string) (*CompletionClaim, error)
+
+	MarkConsumerProcessed(ctx context.Context, eventID, consumerName string) (updated bool, err error)
+
+	MarkConsumerFailed(ctx context.Context, eventID, consumerName, errMsg string) (updated bool, err error)
+
+	CompletionStatus(ctx context.Context, eventID, consumerName string) (*CompletionStatus, error)
 
 	// Ping checks database connectivity (for /readyz).
 	Ping(ctx context.Context) error
