@@ -214,10 +214,84 @@ func (p *Postgres) MarkOutboxPublished(ctx context.Context, eventID string) (boo
 	return n == 1, nil
 }
 
+func (p *Postgres) ClaimConsumerCompletion(
+	ctx context.Context,
+	eventID, consumerName, eventType string,
+) (*CompletionClaim, error) {
+	res, err := p.db.ExecContext(ctx, `
+		INSERT INTO consumer_completions (event_id, consumer_name, event_type, status, attempt_count)
+		VALUES ($1, $2, $3, $4, 1)
+		ON CONFLICT (event_id, consumer_name) DO NOTHING
+	`, eventID, consumerName, eventType, CompletionProcessing)
+	if err != nil {
+		return nil, fmt.Errorf("store: insert consumer completion: %w", err)
+	}
+
+	n, err := res.RowsAffected()
+	if err != nil {
+		return nil, fmt.Errorf("store: rows affected: %w", err)
+	}
+	if n == 1 {
+		return &CompletionClaim{
+			Action:       CompletionClaimNew,
+			AttemptCount: 1,
+		}, nil
+	}
+
+	var status string
+	var attemptCount int
+	err = p.db.QueryRowContext(ctx, `
+		SELECT status, attempt_count
+		FROM consumer_completions
+		WHERE event_id = $1 AND consumer_name = $2
+	`, eventID, consumerName).Scan(&status, &attemptCount)
+	if err != nil {
+		return nil, fmt.Errorf("store: select consumer completion: %w", err)
+	}
+
+	switch status {
+	case CompletionProcessed:
+		return &CompletionClaim{
+			Action:       CompletionClaimAlreadyProcessed,
+			AttemptCount: attemptCount,
+		}, nil
+	case CompletionProcessing:
+		err = p.db.QueryRowContext(ctx, `
+			UPDATE consumer_completions
+			SET attempt_count = attempt_count + 1, updated_at = now()
+			WHERE event_id = $1 AND consumer_name = $2 AND status = $3
+			RETURNING attempt_count
+		`, eventID, consumerName, CompletionProcessing).Scan(&attemptCount)
+		if err != nil {
+			return nil, fmt.Errorf("store: retry consumer completion: %w", err)
+		}
+		return &CompletionClaim{
+			Action:       CompletionClaimRetry,
+			AttemptCount: attemptCount,
+		}, nil
+	case CompletionFailed:
+		err = p.db.QueryRowContext(ctx, `
+			UPDATE consumer_completions
+			SET status = $1, attempt_count = attempt_count + 1, error = NULL, updated_at = now()
+			WHERE event_id = $2 AND consumer_name = $3 AND status = $4
+			RETURNING attempt_count
+		`, CompletionProcessing, eventID, consumerName, CompletionFailed).Scan(&attemptCount)
+		if err != nil {
+			return nil, fmt.Errorf("store: reclaim failed consumer completion: %w", err)
+		}
+		return &CompletionClaim{
+			Action:       CompletionClaimRetryFromFailed,
+			AttemptCount: attemptCount,
+		}, nil
+	default:
+		return nil, fmt.Errorf("store: unexpected consumer completion status %q", status)
+	}
+}
+
 // TruncateLedger removes all rows from processed_events and outbox_events (integration tests).
 func (p *Postgres) TruncateLedger(ctx context.Context) error {
 	// Both tables in one statement: outbox_events FK references processed_events.
-	_, err := p.db.ExecContext(ctx, `TRUNCATE TABLE outbox_events, processed_events`)
+	_, err := p.db.ExecContext(ctx, `TRUNCATE TABLE consumer_completions, outbox_events, processed_events`)
 	return err
 }
 
