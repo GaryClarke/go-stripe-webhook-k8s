@@ -288,9 +288,67 @@ func (p *Postgres) ClaimConsumerCompletion(
 	}
 }
 
-// TruncateLedger removes all rows from processed_events and outbox_events (integration tests).
+func (p *Postgres) MarkConsumerProcessed(ctx context.Context, eventID, consumerName string) (bool, error) {
+	res, err := p.db.ExecContext(ctx, `
+		UPDATE consumer_completions
+		SET status = $1, processed_at = now(), updated_at = now(), error = NULL
+		WHERE event_id = $2 AND consumer_name = $3 AND status = $4
+	`, CompletionProcessed, eventID, consumerName, CompletionProcessing)
+	if err != nil {
+		return false, fmt.Errorf("store: mark consumer processed: %w", err)
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return false, fmt.Errorf("store: rows affected: %w", err)
+	}
+	return n == 1, nil
+}
+
+func (p *Postgres) MarkConsumerFailed(ctx context.Context, eventID, consumerName, errMsg string) (bool, error) {
+	res, err := p.db.ExecContext(ctx, `
+		UPDATE consumer_completions
+		SET status = $1, error = $2, updated_at = now()
+		WHERE event_id = $3 AND consumer_name = $4 AND status = $5
+	`, CompletionFailed, errMsg, eventID, consumerName, CompletionProcessing)
+	if err != nil {
+		return false, fmt.Errorf("store: mark consumer failed: %w", err)
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return false, fmt.Errorf("store: rows affected: %w", err)
+	}
+	return n == 1, nil
+}
+
+func (p *Postgres) CompletionStatus(ctx context.Context, eventID, consumerName string) (*CompletionStatus, error) {
+	var status string
+	var attemptCount int
+	var errMsg sql.NullString
+	err := p.db.QueryRowContext(ctx, `
+		SELECT status, attempt_count, error
+		FROM consumer_completions
+		WHERE event_id = $1 AND consumer_name = $2
+	`, eventID, consumerName).Scan(&status, &attemptCount, &errMsg)
+	if errors.Is(err, sql.ErrNoRows) {
+		return &CompletionStatus{Found: false}, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("store: select consumer completion status: %w", err)
+	}
+	cs := &CompletionStatus{
+		Found:        true,
+		Status:       status,
+		AttemptCount: attemptCount,
+	}
+	if errMsg.Valid {
+		cs.Error = errMsg.String
+	}
+	return cs, nil
+}
+
+// TruncateLedger clears ledger, outbox, and consumer completion tables (integration tests).
 func (p *Postgres) TruncateLedger(ctx context.Context) error {
-	// Both tables in one statement: outbox_events FK references processed_events.
+	// consumer_completions has no FK; outbox_events FK references processed_events.
 	_, err := p.db.ExecContext(ctx, `TRUNCATE TABLE consumer_completions, outbox_events, processed_events`)
 	return err
 }
