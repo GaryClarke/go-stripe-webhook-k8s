@@ -369,3 +369,109 @@ func TestConsumerCompletion_retryFromProcessing(t *testing.T) {
 		t.Fatalf("status = %q, want %q", cs.Status, CompletionProcessing)
 	}
 }
+
+func TestConsumerCompletion_retryFromFailed(t *testing.T) {
+	p := testPostgres(t)
+	resetLedger(t, p)
+	ctx := context.Background()
+
+	const (
+		eventID   = "evt_completion_retry_failed"
+		eventType = "invoice.payment_succeeded"
+		failMsg   = "downstream timeout"
+	)
+
+	claim, err := p.ClaimConsumerCompletion(ctx, eventID, testConsumerName, eventType)
+	if err != nil || claim.Action != CompletionClaimNew {
+		t.Fatalf("first claim = %+v err=%v", claim, err)
+	}
+
+	updated, err := p.MarkConsumerFailed(ctx, eventID, testConsumerName, failMsg)
+	if err != nil || !updated {
+		t.Fatalf("MarkConsumerFailed: updated=%v err=%v", updated, err)
+	}
+
+	cs, err := p.CompletionStatus(ctx, eventID, testConsumerName)
+	if err != nil {
+		t.Fatalf("CompletionStatus after fail: %v", err)
+	}
+	if cs.Status != CompletionFailed || cs.Error != failMsg {
+		t.Fatalf("CompletionStatus after fail = %+v, want failed with error", cs)
+	}
+
+	claim, err = p.ClaimConsumerCompletion(ctx, eventID, testConsumerName, eventType)
+	if err != nil {
+		t.Fatalf("reclaim after failed: %v", err)
+	}
+	if claim.Action != CompletionClaimRetryFromFailed {
+		t.Fatalf("reclaim action = %q, want %q", claim.Action, CompletionClaimRetryFromFailed)
+	}
+	if claim.AttemptCount != 2 {
+		t.Fatalf("attempt_count = %d, want 2", claim.AttemptCount)
+	}
+
+	cs, err = p.CompletionStatus(ctx, eventID, testConsumerName)
+	if err != nil {
+		t.Fatalf("CompletionStatus after reclaim: %v", err)
+	}
+	if cs.Status != CompletionProcessing {
+		t.Fatalf("status = %q, want %q", cs.Status, CompletionProcessing)
+	}
+	if cs.Error != "" {
+		t.Fatalf("error = %q, want cleared", cs.Error)
+	}
+	if cs.AttemptCount != 2 {
+		t.Fatalf("attempt_count = %d, want 2", cs.AttemptCount)
+	}
+}
+
+func TestConsumerCompletion_markProcessedIdempotent(t *testing.T) {
+	p := testPostgres(t)
+	resetLedger(t, p)
+	ctx := context.Background()
+
+	const (
+		eventID   = "evt_completion_idempotent"
+		eventType = "invoice.payment_succeeded"
+	)
+
+	claim, err := p.ClaimConsumerCompletion(ctx, eventID, testConsumerName, eventType)
+	if err != nil || claim.Action != CompletionClaimNew {
+		t.Fatalf("ClaimConsumerCompletion: %+v err=%v", claim, err)
+	}
+
+	updated, err := p.MarkConsumerProcessed(ctx, eventID, testConsumerName)
+	if err != nil || !updated {
+		t.Fatalf("first MarkConsumerProcessed: updated=%v err=%v", updated, err)
+	}
+
+	updated, err = p.MarkConsumerProcessed(ctx, eventID, testConsumerName)
+	if err != nil {
+		t.Fatalf("second MarkConsumerProcessed: %v", err)
+	}
+	if updated {
+		t.Fatal("second MarkConsumerProcessed: want updated=false")
+	}
+
+	cs, err := p.CompletionStatus(ctx, eventID, testConsumerName)
+	if err != nil {
+		t.Fatalf("CompletionStatus: %v", err)
+	}
+	if !cs.Found || cs.Status != CompletionProcessed {
+		t.Fatalf("CompletionStatus = %+v, want processed", cs)
+	}
+}
+
+func TestCompletionStatus_notFound(t *testing.T) {
+	p := testPostgres(t)
+	resetLedger(t, p)
+	ctx := context.Background()
+
+	cs, err := p.CompletionStatus(ctx, "evt_completion_missing", testConsumerName)
+	if err != nil {
+		t.Fatalf("CompletionStatus: %v", err)
+	}
+	if cs.Found {
+		t.Fatalf("CompletionStatus = %+v, want Found=false", cs)
+	}
+}
