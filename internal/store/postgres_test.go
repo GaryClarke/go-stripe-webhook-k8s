@@ -7,6 +7,8 @@ import (
 	"testing"
 )
 
+const testConsumerName = "stripe-webhook-worker"
+
 // testPostgres opens a real Postgres against stripe_webhook_test.
 // Skips (does not fail) when Compose is down or migrations were not applied.
 func testPostgres(t *testing.T) *Postgres {
@@ -256,5 +258,114 @@ func TestStatus_notFound(t *testing.T) {
 	}
 	if es.Found {
 		t.Fatal("Status: want Found=false when event_id absent")
+	}
+}
+
+func TestConsumerCompletion_claimThenMarkProcessed(t *testing.T) {
+	p := testPostgres(t)
+	resetLedger(t, p)
+	ctx := context.Background()
+
+	const (
+		eventID   = "evt_completion_happy"
+		eventType = "invoice.payment_succeeded"
+	)
+	claim, err := p.ClaimConsumerCompletion(ctx, eventID, testConsumerName, eventType)
+	if err != nil {
+		t.Fatalf("ClaimConsumerCompletion: %v", err)
+	}
+	if claim.Action != CompletionClaimNew {
+		t.Fatalf("claim action = %q, want %q", claim.Action, CompletionClaimNew)
+	}
+	if claim.AttemptCount != 1 {
+		t.Fatalf("attempt_count = %d, want 1", claim.AttemptCount)
+	}
+
+	cs, err := p.CompletionStatus(ctx, eventID, testConsumerName)
+	if err != nil {
+		t.Fatalf("CompletionStatus after claim: %v", err)
+	}
+	if !cs.Found || cs.Status != CompletionProcessing {
+		t.Fatalf("CompletionStatus after claim = %+v, want processing", cs)
+	}
+
+	updated, err := p.MarkConsumerProcessed(ctx, eventID, testConsumerName)
+	if err != nil {
+		t.Fatalf("MarkConsumerProcessed: %v", err)
+	}
+	if !updated {
+		t.Fatal("MarkConsumerProcessed: want updated=true")
+	}
+
+	cs, err = p.CompletionStatus(ctx, eventID, testConsumerName)
+	if err != nil {
+		t.Fatalf("CompletionStatus after mark: %v", err)
+	}
+	if !cs.Found || cs.Status != CompletionProcessed {
+		t.Fatalf("CompletionStatus after mark = %+v, want processed", cs)
+	}
+}
+
+func TestConsumerCompletion_claimAlreadyProcessed(t *testing.T) {
+	p := testPostgres(t)
+	resetLedger(t, p)
+	ctx := context.Background()
+
+	const (
+		eventID   = "evt_completion_dup"
+		eventType = "invoice.payment_succeeded"
+	)
+
+	claim, err := p.ClaimConsumerCompletion(ctx, eventID, testConsumerName, eventType)
+	if err != nil || claim.Action != CompletionClaimNew {
+		t.Fatalf("first claim = %+v err=%v", claim, err)
+	}
+
+	updated, err := p.MarkConsumerProcessed(ctx, eventID, testConsumerName)
+	if err != nil || !updated {
+		t.Fatalf("MarkConsumerProcessed: updated=%v err=%v", updated, err)
+	}
+
+	claim, err = p.ClaimConsumerCompletion(ctx, eventID, testConsumerName, eventType)
+	if err != nil {
+		t.Fatalf("second ClaimConsumerCompletion: %v", err)
+	}
+	if claim.Action != CompletionClaimAlreadyProcessed {
+		t.Fatalf("second claim action = %q, want %q", claim.Action, CompletionClaimAlreadyProcessed)
+	}
+}
+
+func TestConsumerCompletion_retryFromProcessing(t *testing.T) {
+	p := testPostgres(t)
+	resetLedger(t, p)
+	ctx := context.Background()
+
+	const (
+		eventID   = "evt_completion_retry"
+		eventType = "invoice.payment_succeeded"
+	)
+
+	claim, err := p.ClaimConsumerCompletion(ctx, eventID, testConsumerName, eventType)
+	if err != nil || claim.Action != CompletionClaimNew {
+		t.Fatalf("first claim = %+v err=%v", claim, err)
+	}
+
+	claim, err = p.ClaimConsumerCompletion(ctx, eventID, testConsumerName, eventType)
+	if err != nil {
+		t.Fatalf("second ClaimConsumerCompletion: %v", err)
+	}
+	if claim.Action != CompletionClaimRetry {
+		t.Fatalf("second claim action = %q, want %q", claim.Action, CompletionClaimRetry)
+	}
+	if claim.AttemptCount != 2 {
+		t.Fatalf("attempt_count = %d, want 2", claim.AttemptCount)
+	}
+
+	cs, err := p.CompletionStatus(ctx, eventID, testConsumerName)
+	if err != nil {
+		t.Fatalf("CompletionStatus: %v", err)
+	}
+	if cs.Status != CompletionProcessing {
+		t.Fatalf("status = %q, want %q", cs.Status, CompletionProcessing)
 	}
 }
