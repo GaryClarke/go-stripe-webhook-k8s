@@ -8,8 +8,9 @@ import (
 	"github.com/joho/godotenv"
 )
 
-// WorkerConfig holds Kafka consumer settings (no Stripe / DB).
+// WorkerConfig holds Kafka consumer settings 
 type WorkerConfig struct {
+	DatabaseURL  string
 	KafkaBrokers []string
 	KafkaTopic   string
 	KafkaGroupID string
@@ -37,8 +38,13 @@ func LoadWorker() (*WorkerConfig, error) {
 	if groupID == "" {
 		return nil, errors.New("config: KAFKA_GROUP_ID is required")
 	}
+	databaseURL := strings.TrimSpace(os.Getenv("DATABASE_URL"))
+	if databaseURL == "" {
+		return nil, errors.New("config: DATABASE_URL is required")
+	}
 
 	return &WorkerConfig{
+		DatabaseURL:  databaseURL,
 		KafkaBrokers: brokers,
 		KafkaTopic:   topic,
 		KafkaGroupID: groupID,

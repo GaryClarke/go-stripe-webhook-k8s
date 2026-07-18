@@ -100,7 +100,9 @@ kafka-smoke:
 	docker compose exec redpanda rpk topic consume $(KAFKA_TOPIC) -o -1 -n 1
 
 worker-run:
-	KAFKA_BROKERS=$(KAFKA_BROKERS) KAFKA_TOPIC=$(KAFKA_TOPIC) KAFKA_GROUP_ID=$(KAFKA_GROUP_ID) go run ./cmd/worker
+	DATABASE_URL=$(DATABASE_URL) \
+	KAFKA_BROKERS=$(KAFKA_BROKERS) KAFKA_TOPIC=$(KAFKA_TOPIC) KAFKA_GROUP_ID=$(KAFKA_GROUP_ID) \
+	go run ./cmd/worker
 
 publisher-run:
 	DATABASE_URL=$(DATABASE_URL) \

@@ -78,7 +78,7 @@ func TestHandleRecord(t *testing.T) {
 				Value:     []byte(tc.value),
 			}
 
-			gotOK := handleRecord(logger, rec)
+			gotOK := handleRecord(logger, nil, rec)
 			if gotOK != tc.wantOK {
 				t.Fatalf("handleRecord() = %v, want %v", gotOK, tc.wantOK)
 			}

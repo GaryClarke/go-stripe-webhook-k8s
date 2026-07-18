@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"integration-engine/internal/config"
 	"integration-engine/internal/engine"
+	"integration-engine/internal/store"
 	"log/slog"
 	"os"
 	"os/signal"
@@ -21,7 +22,11 @@ func main() {
 		logger.Error(configLoadFailed, "error", err.Error())
 		os.Exit(1)
 	}
-
+	st, err := store.NewPostgres(cfg.DatabaseURL)
+	if err != nil {
+		logger.Error(storeOpenFailed, "error", err.Error())
+		os.Exit(1)
+	}
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
@@ -70,7 +75,7 @@ func main() {
 
 				var committed []*kgo.Record
 				for _, rec := range p.Records {
-					if handleRecord(logger, rec) {
+					if handleRecord(logger, st, rec) {
 						committed = append(committed, rec)
 					}
 				}
@@ -94,7 +99,8 @@ func main() {
 }
 
 // handleRecord returns true if the record was handled successfully (safe to commit).
-func handleRecord(logger *slog.Logger, rec *kgo.Record) bool {
+func handleRecord(logger *slog.Logger, st store.Store, rec *kgo.Record) bool {
+	_ = st
 	var job engine.Job
 	if err := json.Unmarshal(rec.Value, &job); err != nil {
 		logger.Error(stripeJobUnmarshalFailed, "error", err.Error())

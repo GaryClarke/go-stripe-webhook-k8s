@@ -108,7 +108,7 @@ func pollUntilEventID(
 				if job.StripeEventID != wantEventID {
 					continue
 				}
-				if !handleRecord(logger, rec) {
+				if !handleRecord(logger, nil, rec) {
 					t.Fatalf("handleRecord failed for %q", wantEventID)
 				}
 				committed = append(committed, rec)

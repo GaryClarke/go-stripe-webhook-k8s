@@ -5,16 +5,21 @@ import (
 	"testing"
 )
 
+const testWorkerDatabaseURL = "postgres://webhook:webhook@localhost:5433/stripe_webhook_dev?sslmode=disable"
+
 func TestLoadWorker(t *testing.T) {
 	cases := []struct {
-		name          string
-		brokers       string
-		topic         string
-		groupID       string
-		wantBrokers   []string
-		wantTopic     string
-		wantGroupID   string
-		wantErrSubstr string
+		name                  string
+		brokers               string
+		topic                 string
+		groupID               string
+		databaseURL           string
+		noDatabaseURL         bool
+		wantBrokers           []string
+		wantTopic             string
+		wantGroupID           string
+		wantDatabaseURL       string
+		wantErrSubstr         string
 	}{
 		{
 			name:        "all required env set",
@@ -78,6 +83,22 @@ func TestLoadWorker(t *testing.T) {
 			groupID:       "",
 			wantErrSubstr: "KAFKA_GROUP_ID",
 		},
+		{
+			name:          "missing DATABASE_URL",
+			brokers:       "localhost:19092",
+			topic:         "stripe-events",
+			groupID:       "stripe-webhook-worker",
+			noDatabaseURL: true,
+			wantErrSubstr: "DATABASE_URL",
+		},
+		{
+			name:          "blank DATABASE_URL",
+			brokers:       "localhost:19092",
+			topic:         "stripe-events",
+			groupID:       "stripe-webhook-worker",
+			databaseURL:   "   ",
+			wantErrSubstr: "DATABASE_URL",
+		},
 	}
 
 	for _, tc := range cases {
@@ -85,6 +106,14 @@ func TestLoadWorker(t *testing.T) {
 			t.Setenv("KAFKA_BROKERS", tc.brokers)
 			t.Setenv("KAFKA_TOPIC", tc.topic)
 			t.Setenv("KAFKA_GROUP_ID", tc.groupID)
+			switch {
+			case tc.noDatabaseURL:
+				t.Setenv("DATABASE_URL", "")
+			case tc.databaseURL != "":
+				t.Setenv("DATABASE_URL", tc.databaseURL)
+			default:
+				t.Setenv("DATABASE_URL", testWorkerDatabaseURL)
+			}
 
 			cfg, err := LoadWorker()
 			if tc.wantErrSubstr != "" {
@@ -112,6 +141,13 @@ func TestLoadWorker(t *testing.T) {
 			}
 			if cfg.KafkaGroupID != tc.wantGroupID {
 				t.Fatalf("KafkaGroupID = %q, want %q", cfg.KafkaGroupID, tc.wantGroupID)
+			}
+			wantDatabaseURL := tc.wantDatabaseURL
+			if wantDatabaseURL == "" {
+				wantDatabaseURL = testWorkerDatabaseURL
+			}
+			if cfg.DatabaseURL != wantDatabaseURL {
+				t.Fatalf("DatabaseURL = %q, want %q", cfg.DatabaseURL, wantDatabaseURL)
 			}
 		})
 	}
