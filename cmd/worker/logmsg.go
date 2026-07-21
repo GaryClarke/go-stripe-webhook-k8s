@@ -12,6 +12,9 @@ const (
 	kafkaFetchFailed  = "kafka_fetch_failed"
 	kafkaCommitFailed = "kafka_commit_failed"
 
-	stripeJobConsumed        = "stripe_job_consumed"
-	stripeJobUnmarshalFailed = "stripe_job_unmarshal_failed"
+	stripeJobConsumed         = "stripe_job_consumed"
+	stripeJobUnmarshalFailed  = "stripe_job_unmarshal_failed"
+	stripeJobDuplicateSkipped = "stripe_job_duplicate_skipped"
+	stripeJobHandled          = "stripe_job_handled"
+	consumerCompletionFailed  = "consumer_completion_failed"
 )

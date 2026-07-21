@@ -108,7 +108,7 @@ func pollUntilEventID(
 				if job.StripeEventID != wantEventID {
 					continue
 				}
-				if !handleRecord(logger, nil, rec) {
+				if !handleRecord(ctx, logger, &fakeCompletionStore{}, "stripe-webhook-worker", rec) {
 					t.Fatalf("handleRecord failed for %q", wantEventID)
 				}
 				committed = append(committed, rec)

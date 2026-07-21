@@ -2,22 +2,45 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
+	"integration-engine/internal/store"
 	"strings"
 	"testing"
 
 	"github.com/twmb/franz-go/pkg/kgo"
 )
 
+type fakeCompletionStore struct {
+	claimAction store.CompletionClaimAction
+}
+
+func (f *fakeCompletionStore) ClaimConsumerCompletion(
+	ctx context.Context, eventID, consumerName, eventType string,
+) (*store.CompletionClaim, error) {
+	action := f.claimAction
+	if action == "" {
+		action = store.CompletionClaimNew
+	}
+	return &store.CompletionClaim{Action: action, AttemptCount: 1}, nil
+}
+func (f *fakeCompletionStore) MarkConsumerProcessed(ctx context.Context, eventID, consumerName string) (bool, error) {
+	return true, nil
+}
+func (f *fakeCompletionStore) MarkConsumerFailed(ctx context.Context, eventID, consumerName, errMsg string) (bool, error) {
+	return true, nil
+}
+
 func TestHandleRecord(t *testing.T) {
 	cases := []struct {
-		name       string
-		value      string
-		partition  int32
-		offset     int64
-		wantOK     bool
-		wantMsg    string
-		wantFields map[string]any
+		name        string
+		value       string
+		claimAction store.CompletionClaimAction
+		partition   int32
+		offset      int64
+		wantOK      bool
+		wantMsg     string
+		wantFields  map[string]any
 	}{
 		{
 			name:    "valid full job",
@@ -56,14 +79,18 @@ func TestHandleRecord(t *testing.T) {
 		{
 			name:    "empty object",
 			value:   `{}`,
-			wantOK:  true,
-			wantMsg: stripeJobConsumed,
+			wantOK:  false,
+			wantMsg: stripeJobUnmarshalFailed,
 			wantFields: map[string]any{
-				"event_id":   "",
-				"event_type": "",
-				"partition":  float64(0),
-				"offset":     float64(0),
+				"error": "missing stripe_event_id",
 			},
+		},
+		{
+			name:        "duplicate skip",
+			value:       `{"stripe_event_id":"evt_dup","event_type":"invoice.payment_succeeded"}`,
+			claimAction: store.CompletionClaimAlreadyProcessed,
+			wantOK:      true,
+			wantMsg:     stripeJobDuplicateSkipped,
 		},
 	}
 
@@ -78,7 +105,9 @@ func TestHandleRecord(t *testing.T) {
 				Value:     []byte(tc.value),
 			}
 
-			gotOK := handleRecord(logger, nil, rec)
+			st := &fakeCompletionStore{claimAction: tc.claimAction}
+
+			gotOK := handleRecord(context.Background(), logger, st, "stripe-webhook-worker", rec)
 			if gotOK != tc.wantOK {
 				t.Fatalf("handleRecord() = %v, want %v", gotOK, tc.wantOK)
 			}

@@ -101,3 +101,10 @@ type Store interface {
 	// Ping checks database connectivity (for /readyz).
 	Ping(ctx context.Context) error
 }
+
+// ConsumerCompletionStore is what the worker needs to claim and mark completion.
+type ConsumerCompletionStore interface {
+	ClaimConsumerCompletion(ctx context.Context, eventID, consumerName, eventType string) (*CompletionClaim, error)
+	MarkConsumerProcessed(ctx context.Context, eventID, consumerName string) (updated bool, err error)
+	MarkConsumerFailed(ctx context.Context, eventID, consumerName, errMsg string) (updated bool, err error)
+}

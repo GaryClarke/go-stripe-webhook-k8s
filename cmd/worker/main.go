@@ -75,7 +75,7 @@ func main() {
 
 				var committed []*kgo.Record
 				for _, rec := range p.Records {
-					if handleRecord(logger, st, rec) {
+					if handleRecord(ctx, logger, st, cfg.KafkaGroupID, rec) {
 						committed = append(committed, rec)
 					}
 				}
@@ -99,11 +99,59 @@ func main() {
 }
 
 // handleRecord returns true if the record was handled successfully (safe to commit).
-func handleRecord(logger *slog.Logger, st store.Store, rec *kgo.Record) bool {
-	_ = st
+func handleRecord(
+	ctx context.Context,
+	logger *slog.Logger,
+	st store.ConsumerCompletionStore,
+	consumerName string,
+	rec *kgo.Record,
+) bool {
+	// Step 1: empty struct
 	var job engine.Job
+	// Step 2: fill it from Kafka message bytes
 	if err := json.Unmarshal(rec.Value, &job); err != nil {
 		logger.Error(stripeJobUnmarshalFailed, "error", err.Error())
+		return false
+	}
+	// ↑ After this line, job.StripeEventID and job.EventType are set
+	//   (if they were in the JSON — publisher put them there when AcceptEvent ran)
+	if job.StripeEventID == "" {
+		logger.Error(stripeJobUnmarshalFailed, "error", "missing stripe_event_id")
+		return false
+	}
+
+	// Step 3: NOW you can claim — job exists and has fields
+	claim, err := st.ClaimConsumerCompletion(ctx, job.StripeEventID, consumerName, job.EventType)
+	if err != nil {
+		logger.Error(consumerCompletionFailed, "event_id", job.StripeEventID, "error", err.Error())
+		return false
+	}
+
+	if claim.Action == store.CompletionClaimAlreadyProcessed {
+		logger.Info(stripeJobDuplicateSkipped,
+			"event_id", job.StripeEventID,
+			"event_type", job.EventType,
+			"partition", rec.Partition,
+			"offset", rec.Offset,
+		)
+		return true
+	}
+	// new / retry / retry_from_failed → handleJob → mark → return true
+
+	if err := handleJob(ctx, logger, job); err != nil {
+		if _, markErr := st.MarkConsumerFailed(ctx, job.StripeEventID, consumerName, err.Error()); markErr != nil {
+			logger.Error(consumerCompletionFailed, "event_id", job.StripeEventID, "error", markErr.Error())
+		}
+		return false
+	}
+
+	updated, err := st.MarkConsumerProcessed(ctx, job.StripeEventID, consumerName)
+	if err != nil {
+		logger.Error(consumerCompletionFailed, "event_id", job.StripeEventID, "error", err.Error())
+		return false
+	}
+	if !updated {
+		logger.Error(consumerCompletionFailed, "event_id", job.StripeEventID, "error", "mark processed: row not processing")
 		return false
 	}
 
