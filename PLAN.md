@@ -270,7 +270,7 @@ You do not need a full cluster-distributed Kafka on day one; **Redpanda** in Com
 
 **Branch (suggested):** **`18-consumer-completion`** — see **[docs/branches/18-consumer-completion.md](docs/branches/18-consumer-completion.md)**.
 
-**Milestone 10 status:** **Not started** — branch doc locked; implementation next.
+**Milestone 10 status:** **Complete (local)** on branch **`18-consumer-completion`** — **`consumer_completions`** table, idempotent worker (**claim → handle → mark processed** before offset commit), duplicate delivery logs **`stripe_job_duplicate_skipped`**. README E2E documents four layers. Merge to **`main`** when ready.
 
 **Paused cloud work (when AWS/ROSA resume):** post-M9 steps 2–7 in **[docs/branches/17-kafka-outbox.md](docs/branches/17-kafka-outbox.md)** (K8s publisher/worker, MSK, TLS/SASL, secrets automation).
 

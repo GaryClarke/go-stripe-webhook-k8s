@@ -4,7 +4,7 @@
 
 **Git branch:** `18-consumer-completion`
 
-**Status:** **Not started** — decisions locked; implementation pending.
+**Status:** **Complete (local)** — store, worker, E2E verified on branch **`18-consumer-completion`**.
 
 **Prerequisite:** **Milestone 9** complete on **`main`** (outbox, publisher, worker consume + log).
 
@@ -233,11 +233,11 @@ stripe listen --latest -> API -> outbox -> publisher -> Kafka -> worker -> consu
 ## Verify checklist
 
 - [x] Phase 0: Third table + offset-after-DB understood; **`processing`** → retry locked
-- [ ] Phase 1: Migration + store methods + integration tests
-- [ ] Phase 1b: Store interface segregation (optional refactor, no SQL)
-- [ ] Phase 2: Worker **`DATABASE_URL`** + store wired
-- [ ] Phase 3: Idempotent handle + commit discipline
-- [ ] Phase 4: README + PLAN M10 complete
+- [x] Phase 1: Migration + store methods + integration tests
+- [ ] Phase 1b: Store interface segregation (optional refactor, no SQL) — partial: **`ConsumerCompletionStore`** for worker
+- [x] Phase 2: Worker **`DATABASE_URL`** + store wired
+- [x] Phase 3: Idempotent handle + commit discipline
+- [x] Phase 4: README + PLAN M10 complete
 
 ---
 
