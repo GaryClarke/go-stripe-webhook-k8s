@@ -32,7 +32,7 @@ Add a row when you open or complete a branch.
 | `15-rosa-lab-deploy` | [15-rosa-lab-deploy.md](15-rosa-lab-deploy.md) | **Milestone 7** (in progress on **`main`**): ROSA lab, kustomize, **GHA** deploy, **`lab-on`/`lab-off`**; Phase 5 test pending |
 | `16-idempotency-postgres` | [16-idempotency-postgres.md](16-idempotency-postgres.md) | **Milestone 8** (done): Postgres **`processed_events`**, RDS, in-cluster Goose, **`replicas: 2`**, cross-Pod dedupe |
 | `17-kafka-outbox` | [17-kafka-outbox.md](17-kafka-outbox.md) | **Milestone 9** (done): Redpanda locally, transactional **outbox**, **`accepted`** ledger, publisher + **`cmd/worker`** |
-| `18-consumer-completion` | [18-consumer-completion.md](18-consumer-completion.md) | **Milestone 10** (next): **`consumer_completions`** table, idempotent worker, offset after DB — **local only** |
+| `18-consumer-completion` | [18-consumer-completion.md](18-consumer-completion.md) | **Milestone 10** (done on **`main`**): **`consumer_completions`** table, idempotent worker, offset after DB — **local only** |
 
 **Doc template:** mirror the style in [original-branches](../original-branches/README.md): goal, scope, key files, how to verify, follow-ups.
 

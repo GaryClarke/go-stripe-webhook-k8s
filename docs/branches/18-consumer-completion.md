@@ -4,7 +4,7 @@
 
 **Git branch:** `18-consumer-completion`
 
-**Status:** **Complete (local)** — store, worker, E2E verified on branch **`18-consumer-completion`**.
+**Status:** **Complete on `main`** — store, worker, E2E verified; merged from **`18-consumer-completion`**.
 
 **Prerequisite:** **Milestone 9** complete on **`main`** (outbox, publisher, worker consume + log).
 
