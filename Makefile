@@ -20,9 +20,9 @@ build:
 test:
 	go test -v ./...
 
-# Kafka worker integration test (requires make kafka-up). Excluded from default go test via //go:build integration.
+# Kafka + Postgres worker integration tests (requires make kafka-up for ConsumeJob; db-up + db-migrate-test for completion tests).
 test-integration:
-	go test -tags=integration ./cmd/worker/... -run TestWorker_ConsumeJob_Integration -v
+	go test -tags=integration ./cmd/worker/... -v
 
 lint:
 	go vet ./...

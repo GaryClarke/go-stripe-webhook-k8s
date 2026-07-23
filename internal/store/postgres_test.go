@@ -9,9 +9,9 @@ import (
 
 const testConsumerName = "stripe-webhook-worker"
 
-// testPostgres opens a real Postgres against stripe_webhook_test.
+// openTestPostgres opens a real Postgres against stripe_webhook_test.
 // Skips (does not fail) when Compose is down or migrations were not applied.
-func testPostgres(t *testing.T) *Postgres {
+func openTestPostgres(t *testing.T) *Postgres {
 	t.Helper()
 
 	dsn := os.Getenv("DATABASE_URL_TEST")
@@ -36,7 +36,7 @@ func resetLedger(t *testing.T, p *Postgres) {
 }
 
 func TestProcessEvent_claimThenDuplicate(t *testing.T) {
-	p := testPostgres(t)
+	p := openTestPostgres(t)
 	resetLedger(t, p)
 	ctx := context.Background()
 
@@ -89,7 +89,7 @@ func TestProcessEvent_claimThenDuplicate(t *testing.T) {
 }
 
 func TestAcceptEvent_claimThenDuplicate(t *testing.T) {
-	p := testPostgres(t)
+	p := openTestPostgres(t)
 	resetLedger(t, p)
 	ctx := context.Background()
 
@@ -186,7 +186,7 @@ func TestAcceptEvent_claimThenDuplicate(t *testing.T) {
 }
 
 func TestOutboxPublisher_nextThenMarkPublished(t *testing.T) {
-	p := testPostgres(t)
+	p := openTestPostgres(t)
 	resetLedger(t, p)
 	ctx := context.Background()
 
@@ -247,7 +247,7 @@ func TestOutboxPublisher_nextThenMarkPublished(t *testing.T) {
 }
 
 func TestStatus_notFound(t *testing.T) {
-	p := testPostgres(t)
+	p := openTestPostgres(t)
 	resetLedger(t, p)
 	ctx := context.Background()
 
@@ -262,7 +262,7 @@ func TestStatus_notFound(t *testing.T) {
 }
 
 func TestConsumerCompletion_claimThenMarkProcessed(t *testing.T) {
-	p := testPostgres(t)
+	p := openTestPostgres(t)
 	resetLedger(t, p)
 	ctx := context.Background()
 
@@ -307,7 +307,7 @@ func TestConsumerCompletion_claimThenMarkProcessed(t *testing.T) {
 }
 
 func TestConsumerCompletion_claimAlreadyProcessed(t *testing.T) {
-	p := testPostgres(t)
+	p := openTestPostgres(t)
 	resetLedger(t, p)
 	ctx := context.Background()
 
@@ -336,7 +336,7 @@ func TestConsumerCompletion_claimAlreadyProcessed(t *testing.T) {
 }
 
 func TestConsumerCompletion_retryFromProcessing(t *testing.T) {
-	p := testPostgres(t)
+	p := openTestPostgres(t)
 	resetLedger(t, p)
 	ctx := context.Background()
 
@@ -371,7 +371,7 @@ func TestConsumerCompletion_retryFromProcessing(t *testing.T) {
 }
 
 func TestConsumerCompletion_retryFromFailed(t *testing.T) {
-	p := testPostgres(t)
+	p := openTestPostgres(t)
 	resetLedger(t, p)
 	ctx := context.Background()
 
@@ -426,7 +426,7 @@ func TestConsumerCompletion_retryFromFailed(t *testing.T) {
 }
 
 func TestConsumerCompletion_markProcessedIdempotent(t *testing.T) {
-	p := testPostgres(t)
+	p := openTestPostgres(t)
 	resetLedger(t, p)
 	ctx := context.Background()
 
@@ -463,7 +463,7 @@ func TestConsumerCompletion_markProcessedIdempotent(t *testing.T) {
 }
 
 func TestCompletionStatus_notFound(t *testing.T) {
-	p := testPostgres(t)
+	p := openTestPostgres(t)
 	resetLedger(t, p)
 	ctx := context.Background()
 
