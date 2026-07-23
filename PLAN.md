@@ -50,7 +50,7 @@ Each milestone lists **what to learn**, **what changes in the repo**, and **how 
 
 **Do not suggest as the default next step:** **`make lab-on`**, new ROSA deploy work, MSK Terraform, or multi-env AWS promotion unless the user explicitly resumes the cloud track.
 
-**Current focus:** **Milestone 10 complete on `main`**. Next **local** options (see **[docs/branches/18-consumer-completion.md](docs/branches/18-consumer-completion.md)** follow-ups): real downstream HTTP in **`handleJob`**, outbox **`failed`** retry, store interface segregation (Phase 1b). **Cloud track paused** — see **Active learning track** above.
+**Current focus:** **Milestone 11** — downstream HTTP in **`handleJob`**, failure classification, offset rules. See **[docs/branches/19-downstream-http.md](docs/branches/19-downstream-http.md)**. **Cloud track paused** — see **Active learning track** above.
 
 ---
 
@@ -273,6 +273,24 @@ You do not need a full cluster-distributed Kafka on day one; **Redpanda** in Com
 **Milestone 10 status:** **Complete on `main`**. Shipped: **`consumer_completions`** table, idempotent worker (**claim → handle → mark processed** before offset commit), duplicate delivery logs **`stripe_job_duplicate_skipped`**, README four-layer E2E, worker completion integration tests. See **[docs/branches/18-consumer-completion.md](docs/branches/18-consumer-completion.md)**.
 
 **Paused cloud work (when AWS/ROSA resume):** post-M9 steps 2–7 in **[docs/branches/17-kafka-outbox.md](docs/branches/17-kafka-outbox.md)** (K8s publisher/worker, MSK, TLS/SASL, secrets automation).
+
+---
+
+## Milestone 11: Downstream HTTP (local)
+
+| | |
+|--|--|
+| **Learn** | External side effects under at-least-once delivery; **retryable vs permanent** failure handling; **when to commit Kafka offsets** so partitions do not stall on poison messages. |
+| **Build** | Replace **`handleJob`** log stub with **`POST`** to **`DOWNSTREAM_URL`**; classify errors; **retryable** → mark **`failed`**, no offset commit; **permanent** → mark **`failed`**, **commit offset**; duplicate skip → **no HTTP**. **`httptest`** coverage. **No** second Kafka topic, DLQ, or max-attempt policy in this milestone. Branch doc: **[docs/branches/19-downstream-http.md](docs/branches/19-downstream-http.md)**. |
+| **Done when** | Tests prove 2xx → processed + commit; 503 → failed + no commit; 400 → failed + commit; duplicate → no downstream call. README updated. |
+
+**Prerequisite:** **Milestone 10** complete on **`main`**.
+
+**Explicitly out of scope for M11:** DLQ (**M13**), max attempts / backoff (**M12**), second Kafka publish, real third-party credentials, ROSA/K8s/MSK.
+
+**Branch (suggested):** **`19-downstream-http`** — see **[docs/branches/19-downstream-http.md](docs/branches/19-downstream-http.md)**.
+
+**Milestone 11 status:** **Not started** — branch doc locked; implementation next.
 
 ---
 
