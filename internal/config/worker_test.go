@@ -6,6 +6,7 @@ import (
 )
 
 const testWorkerDatabaseURL = "postgres://webhook:webhook@localhost:5433/stripe_webhook_dev?sslmode=disable"
+const testWorkerDownstreamURL = "http://localhost:9999/downstream"
 
 func TestLoadWorker(t *testing.T) {
 	cases := []struct {
@@ -15,10 +16,13 @@ func TestLoadWorker(t *testing.T) {
 		groupID               string
 		databaseURL           string
 		noDatabaseURL         bool
+		downstreamURL         string
+		noDownstreamURL       bool
 		wantBrokers           []string
 		wantTopic             string
 		wantGroupID           string
 		wantDatabaseURL       string
+		wantDownstreamURL     string
 		wantErrSubstr         string
 	}{
 		{
@@ -99,6 +103,49 @@ func TestLoadWorker(t *testing.T) {
 			databaseURL:   "   ",
 			wantErrSubstr: "DATABASE_URL",
 		},
+		{
+			name:          "missing DOWNSTREAM_URL",
+			brokers:       "localhost:19092",
+			topic:         "stripe-events",
+			groupID:       "stripe-webhook-worker",
+			noDownstreamURL: true,
+			wantErrSubstr: "DOWNSTREAM_URL",
+		},
+		{
+			name:          "blank DOWNSTREAM_URL",
+			brokers:       "localhost:19092",
+			topic:         "stripe-events",
+			groupID:       "stripe-webhook-worker",
+			downstreamURL: "   ",
+			wantErrSubstr: "DOWNSTREAM_URL",
+		},
+		{
+			name:          "invalid DOWNSTREAM_URL scheme",
+			brokers:       "localhost:19092",
+			topic:         "stripe-events",
+			groupID:       "stripe-webhook-worker",
+			downstreamURL: "ftp://example.com/hook",
+			wantErrSubstr: "http or https",
+		},
+		{
+			name:          "DOWNSTREAM_URL missing host",
+			brokers:       "localhost:19092",
+			topic:         "stripe-events",
+			groupID:       "stripe-webhook-worker",
+			downstreamURL: "http://",
+			wantErrSubstr: "host",
+		},
+		{
+			name:              "DOWNSTREAM_URL https trimmed",
+			brokers:           "localhost:19092",
+			topic:             "stripe-events",
+			groupID:           "stripe-webhook-worker",
+			downstreamURL:     "  https://mock:8080/downstream  ",
+			wantBrokers:       []string{"localhost:19092"},
+			wantTopic:         "stripe-events",
+			wantGroupID:       "stripe-webhook-worker",
+			wantDownstreamURL: "https://mock:8080/downstream",
+		},
 	}
 
 	for _, tc := range cases {
@@ -113,6 +160,14 @@ func TestLoadWorker(t *testing.T) {
 				t.Setenv("DATABASE_URL", tc.databaseURL)
 			default:
 				t.Setenv("DATABASE_URL", testWorkerDatabaseURL)
+			}
+			switch {
+			case tc.noDownstreamURL:
+				t.Setenv("DOWNSTREAM_URL", "")
+			case tc.downstreamURL != "":
+				t.Setenv("DOWNSTREAM_URL", tc.downstreamURL)
+			default:
+				t.Setenv("DOWNSTREAM_URL", testWorkerDownstreamURL)
 			}
 
 			cfg, err := LoadWorker()
@@ -148,6 +203,13 @@ func TestLoadWorker(t *testing.T) {
 			}
 			if cfg.DatabaseURL != wantDatabaseURL {
 				t.Fatalf("DatabaseURL = %q, want %q", cfg.DatabaseURL, wantDatabaseURL)
+			}
+			wantDownstreamURL := tc.wantDownstreamURL
+			if wantDownstreamURL == "" {
+				wantDownstreamURL = testWorkerDownstreamURL
+			}
+			if cfg.DownstreamURL != wantDownstreamURL {
+				t.Fatalf("DownstreamURL = %q, want %q", cfg.DownstreamURL, wantDownstreamURL)
 			}
 		})
 	}

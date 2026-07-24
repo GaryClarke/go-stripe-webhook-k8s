@@ -2,6 +2,8 @@ package config
 
 import (
 	"errors"
+	"fmt"
+	"net/url"
 	"os"
 	"strings"
 
@@ -10,10 +12,11 @@ import (
 
 // WorkerConfig holds Kafka consumer settings 
 type WorkerConfig struct {
-	DatabaseURL  string
-	KafkaBrokers []string
-	KafkaTopic   string
-	KafkaGroupID string
+	DatabaseURL   string
+	KafkaBrokers  []string
+	KafkaTopic    string
+	KafkaGroupID  string
+	DownstreamURL string
 }
 
 // LoadWorker reads worker configuration from the environment.
@@ -42,12 +45,21 @@ func LoadWorker() (*WorkerConfig, error) {
 	if databaseURL == "" {
 		return nil, errors.New("config: DATABASE_URL is required")
 	}
+	downstreamURL := strings.TrimSpace(os.Getenv("DOWNSTREAM_URL"))
+	if downstreamURL == "" {
+		return nil, errors.New("config: DOWNSTREAM_URL is required")
+	}
+	downstreamURL, err := validateDownstreamURL(downstreamURL)
+	if err != nil {
+		return nil, err
+	}
 
 	return &WorkerConfig{
-		DatabaseURL:  databaseURL,
-		KafkaBrokers: brokers,
-		KafkaTopic:   topic,
-		KafkaGroupID: groupID,
+		DatabaseURL:   databaseURL,
+		KafkaBrokers:  brokers,
+		KafkaTopic:    topic,
+		KafkaGroupID:  groupID,
+		DownstreamURL: downstreamURL,
 	}, nil
 }
 
@@ -61,4 +73,21 @@ func splitCSV(s string) []string {
 		}
 	}
 	return out
+}
+
+func validateDownstreamURL(raw string) (string, error) {
+	u, err := url.Parse(raw)
+	if err != nil {
+		return "", fmt.Errorf("config: invalid DOWNSTREAM_URL: %w", err)
+	}
+
+	switch u.Scheme {
+	case "http", "https":
+	default:
+		return "", errors.New("config: DOWNSTREAM_URL must use http or https")
+	}
+	if u.Host == "" {
+		return "", errors.New("config: DOWNSTREAM_URL must include a host")
+	}
+	return raw, nil
 }

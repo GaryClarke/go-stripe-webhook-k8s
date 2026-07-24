@@ -78,6 +78,8 @@ db-migrate-test:
 KAFKA_BROKERS ?= localhost:19092
 KAFKA_TOPIC ?= stripe-events
 KAFKA_GROUP_ID ?= stripe-webhook-worker
+# Worker downstream HTTP (M11). Override when a mock or real endpoint is listening.
+DOWNSTREAM_URL ?= http://localhost:8080/downstream
 
 # Start broker + Console only (Postgres can stay stopped).
 kafka-up:
@@ -101,6 +103,7 @@ kafka-smoke:
 
 worker-run:
 	DATABASE_URL=$(DATABASE_URL) \
+	DOWNSTREAM_URL=$(DOWNSTREAM_URL) \
 	KAFKA_BROKERS=$(KAFKA_BROKERS) KAFKA_TOPIC=$(KAFKA_TOPIC) KAFKA_GROUP_ID=$(KAFKA_GROUP_ID) \
 	go run ./cmd/worker
 
