@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"integration-engine/internal/engine"
 	"integration-engine/internal/store"
 	"strings"
 	"testing"
@@ -30,6 +31,10 @@ func (f *fakeCompletionStore) MarkConsumerProcessed(ctx context.Context, eventID
 func (f *fakeCompletionStore) MarkConsumerFailed(ctx context.Context, eventID, consumerName, errMsg string) (bool, error) {
 	return true, nil
 }
+
+type fakeDownstream struct{}
+
+func (fakeDownstream) DeliverJob(context.Context, engine.Job) error { return nil }
 
 func TestHandleRecord(t *testing.T) {
 	cases := []struct {
@@ -107,7 +112,7 @@ func TestHandleRecord(t *testing.T) {
 
 			st := &fakeCompletionStore{claimAction: tc.claimAction}
 
-			gotOK := handleRecord(context.Background(), logger, st, "stripe-webhook-worker", rec)
+			gotOK := handleRecord(context.Background(), logger, st, fakeDownstream{}, "stripe-webhook-worker", rec)
 			if gotOK != tc.wantOK {
 				t.Fatalf("handleRecord() = %v, want %v", gotOK, tc.wantOK)
 			}

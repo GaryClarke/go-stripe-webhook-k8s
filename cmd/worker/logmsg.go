@@ -16,5 +16,7 @@ const (
 	stripeJobUnmarshalFailed  = "stripe_job_unmarshal_failed"
 	stripeJobDuplicateSkipped = "stripe_job_duplicate_skipped"
 	stripeJobHandled          = "stripe_job_handled"
-	consumerCompletionFailed  = "consumer_completion_failed"
+	stripeJobDownstreamFailed = "stripe_job_downstream_failed"
+
+	consumerCompletionFailed = "consumer_completion_failed"
 )

@@ -27,6 +27,8 @@ func main() {
 		logger.Error(storeOpenFailed, "error", err.Error())
 		os.Exit(1)
 	}
+	downstream := NewHTTPDownstream(cfg.DownstreamURL, nil)
+
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
@@ -75,7 +77,7 @@ func main() {
 
 				var committed []*kgo.Record
 				for _, rec := range p.Records {
-					if handleRecord(ctx, logger, st, cfg.KafkaGroupID, rec) {
+					if handleRecord(ctx, logger, st, downstream, cfg.KafkaGroupID, rec) {
 						committed = append(committed, rec)
 					}
 				}
@@ -103,6 +105,7 @@ func handleRecord(
 	ctx context.Context,
 	logger *slog.Logger,
 	st store.ConsumerCompletionStore,
+	downstream DownstreamClient,
 	consumerName string,
 	rec *kgo.Record,
 ) bool {
@@ -138,7 +141,7 @@ func handleRecord(
 	}
 	// new / retry / retry_from_failed → handleJob → mark → return true
 
-	if err := handleJob(ctx, logger, job); err != nil {
+	if err := handleJob(ctx, logger, downstream, job); err != nil {
 		if _, markErr := st.MarkConsumerFailed(ctx, job.StripeEventID, consumerName, err.Error()); markErr != nil {
 			logger.Error(consumerCompletionFailed, "event_id", job.StripeEventID, "error", markErr.Error())
 		}
