@@ -144,8 +144,9 @@ func handleRecord(
 	if err := handleJob(ctx, logger, downstream, job); err != nil {
 		if _, markErr := st.MarkConsumerFailed(ctx, job.StripeEventID, consumerName, err.Error()); markErr != nil {
 			logger.Error(consumerCompletionFailed, "event_id", job.StripeEventID, "error", markErr.Error())
+			return false
 		}
-		return false
+		return !isRetryableJobError(err)
 	}
 
 	updated, err := st.MarkConsumerProcessed(ctx, job.StripeEventID, consumerName)
