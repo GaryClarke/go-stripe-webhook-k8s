@@ -32,20 +32,27 @@ func (f *fakeCompletionStore) MarkConsumerFailed(ctx context.Context, eventID, c
 	return true, nil
 }
 
-type fakeDownstream struct{}
+type fakeDownstream struct {
+	err   error
+	calls int
+}
 
-func (fakeDownstream) DeliverJob(context.Context, engine.Job) error { return nil }
+func (f *fakeDownstream) DeliverJob(_ context.Context, _ engine.Job) error {
+	f.calls++
+	return f.err
+}
 
 func TestHandleRecord(t *testing.T) {
 	cases := []struct {
-		name        string
-		value       string
-		claimAction store.CompletionClaimAction
-		partition   int32
-		offset      int64
-		wantOK      bool
-		wantMsg     string
-		wantFields  map[string]any
+		name          string
+		value         string
+		claimAction   store.CompletionClaimAction
+		partition     int32
+		offset        int64
+		wantOK        bool
+		wantMsg       string
+		wantFields    map[string]any
+		downstreamErr error
 	}{
 		{
 			name:    "valid full job",
@@ -97,6 +104,20 @@ func TestHandleRecord(t *testing.T) {
 			wantOK:      true,
 			wantMsg:     stripeJobDuplicateSkipped,
 		},
+		{
+			name:          "downstream retryable 503",
+			value:         `{"stripe_event_id":"evt_503","event_type":"invoice.payment_succeeded"}`,
+			downstreamErr: classifyHTTPStatus(503),
+			wantOK:        false,
+			wantMsg:       stripeJobDownstreamFailed,
+		},
+		{
+			name:          "downstream permanent 400",
+			value:         `{"stripe_event_id":"evt_400","event_type":"invoice.payment_succeeded"}`,
+			downstreamErr: classifyHTTPStatus(400),
+			wantOK:        true, // commit offset after failed row
+			wantMsg:       stripeJobDownstreamFailed,
+		},
 	}
 
 	for _, tc := range cases {
@@ -111,8 +132,9 @@ func TestHandleRecord(t *testing.T) {
 			}
 
 			st := &fakeCompletionStore{claimAction: tc.claimAction}
+			ds := &fakeDownstream{err: tc.downstreamErr}
 
-			gotOK := handleRecord(context.Background(), logger, st, fakeDownstream{}, "stripe-webhook-worker", rec)
+			gotOK := handleRecord(context.Background(), logger, st, ds, "stripe-webhook-worker", rec)
 			if gotOK != tc.wantOK {
 				t.Fatalf("handleRecord() = %v, want %v", gotOK, tc.wantOK)
 			}
