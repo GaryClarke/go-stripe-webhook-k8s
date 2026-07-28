@@ -51,8 +51,9 @@ func TestHandleRecord(t *testing.T) {
 		offset        int64
 		wantOK        bool
 		wantMsg       string
-		wantFields    map[string]any
-		downstreamErr error
+		wantFields          map[string]any
+		downstreamErr       error
+		wantDownstreamCalls *int
 	}{
 		{
 			name:    "valid full job",
@@ -103,6 +104,7 @@ func TestHandleRecord(t *testing.T) {
 			claimAction: store.CompletionClaimAlreadyProcessed,
 			wantOK:      true,
 			wantMsg:     stripeJobDuplicateSkipped,
+			wantDownstreamCalls: new(int),
 		},
 		{
 			name:          "downstream retryable 503",
@@ -148,6 +150,10 @@ func TestHandleRecord(t *testing.T) {
 				if fields[key] != want {
 					t.Fatalf("%s = %v, want %v", key, fields[key], want)
 				}
+			}
+
+			if tc.wantDownstreamCalls != nil && ds.calls != *tc.wantDownstreamCalls {
+				t.Fatalf("DeliverJob calls = %d, want %d", ds.calls, *tc.wantDownstreamCalls)
 			}
 		})
 	}
