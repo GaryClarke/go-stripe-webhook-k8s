@@ -61,13 +61,16 @@ make kafka-smoke       # produce + consume one test message on stripe-events
 | **Kafka API** | **`localhost:19092`** — set **`KAFKA_BROKERS`** for Go apps on your Mac |
 | **Console** | **http://localhost:8888** |
 | **Postgres** | **`localhost:5433`** (unchanged from M8) |
-| **HTTP API** | **`localhost:8080`** — **`cmd/api`**, not in Compose |
+| **HTTP API** | **`localhost:8080`** — **`cmd/api`** (Stripe webhooks), not in Compose |
+| **Downstream (M11)** | **`localhost:8081`** — separate HTTP service the worker POSTs to; not **`cmd/api`** |
 
 Inside Compose (Console → broker), clients use **`redpanda:9092`**. **`rpk`** smoke tests: see **`make kafka-smoke`**. Produce via stdin (current **`rpk`**): `printf '%s\n' '{"stripe_event_id":"evt_test"}' | docker compose exec -T redpanda rpk topic produce stripe-events -k evt_test`.
 
-#### Local end-to-end (webhook → outbox → Kafka → worker → consumer completion)
+#### Local end-to-end (webhook → outbox → Kafka → worker → downstream HTTP)
 
-**Prerequisites:** [Stripe CLI](https://stripe.com/docs/stripe-cli) installed and logged in; **`.env`** with **`STRIPE_WEBHOOK_SECRET`** and **`DATABASE_URL`** (see HTTP server section above). **`make worker-run`** and **`make publisher-run`** pass **`DATABASE_URL`** from the **`Makefile`** (defaults to dev Postgres).
+**Prerequisites:** [Stripe CLI](https://stripe.com/docs/stripe-cli) installed and logged in; **`.env`** with **`STRIPE_WEBHOOK_SECRET`** and **`DATABASE_URL`** (see HTTP server section above). **`make worker-run`** passes **`DATABASE_URL`** and **`DOWNSTREAM_URL`** from the **`Makefile`** (dev Postgres + **`http://localhost:8081/downstream`**). **`make publisher-run`** passes **`DATABASE_URL`** only.
+
+**Downstream is not the Stripe API.** **`cmd/api`** listens on **`8080`** for webhooks. The worker POSTs job JSON to **`DOWNSTREAM_URL`** (default port **`8081`**) — a separate mock or real service (another repo in production). Without a listener on **`8081`**, the worker logs **`stripe_job_downstream_failed`** (retryable connection errors; offsets not committed). For manual E2E, run any HTTP server that accepts POST and returns **2xx** on **`8081`**, or override: **`make worker-run DOWNSTREAM_URL=http://localhost:9090/hook`**.
 
 **One-time setup:**
 
@@ -75,13 +78,13 @@ Inside Compose (Console → broker), clients use **`redpanda:9092`**. **`rpk`** 
 make db-up db-migrate
 ```
 
-**Four layers (M10):**
+**Five beats (M11):**
 
 ```text
-Stripe → API (processed_events) → outbox → publisher → Kafka → worker → consumer_completions
+Stripe → API (processed_events) → outbox → publisher → Kafka → worker → consumer_completions → downstream HTTP
 ```
 
-**Four terminals** (start publisher and worker before triggering events):
+**Four terminals** (start publisher and worker before triggering events; optional fifth: downstream mock on **`8081`**):
 
 | Terminal | Command |
 |----------|---------|
@@ -89,6 +92,7 @@ Stripe → API (processed_events) → outbox → publisher → Kafka → worker 
 | 2 — Publisher | `make publisher-run` |
 | 3 — Worker | `make worker-run` |
 | 4 — Stripe | `stripe listen --latest --forward-to http://127.0.0.1:8080/webhooks/stripe` |
+| 5 — Downstream (optional) | Any POST **2xx** listener on **`8081`** (see note above) |
 
 Copy the **`whsec_...`** signing secret from **`stripe listen`** into **`.env`** as **`STRIPE_WEBHOOK_SECRET`**, then restart the API if it was already running.
 
@@ -104,7 +108,7 @@ stripe trigger invoice.payment_succeeded
 |-----------|----------------|
 | **API** | **`stripe_event_accepted`**, HTTP **204** |
 | **Publisher** | **`outbox_publish_succeeded`** per event |
-| **Worker** | **`stripe_job_handled`** then **`stripe_job_consumed`** per event; redelivery logs **`stripe_job_duplicate_skipped`** |
+| **Worker** | **`stripe_job_handled`** then **`stripe_job_consumed`** when downstream returns **2xx**; **`stripe_job_downstream_failed`** on errors (**503** / timeout → retry, no offset commit; **400** → permanent, offset committed after **`failed`** row); duplicate redelivery → **`stripe_job_duplicate_skipped`** (no HTTP) |
 | **Console** | Messages on topic **`stripe-events`** — **http://localhost:8888** |
 
 **DB check** (ledger **`accepted`**, outbox **`published`**, consumer **`processed`**):
@@ -120,7 +124,7 @@ On a fresh dev DB, counts should match after one trigger. On a long-lived DB, ol
 
 Use **`stripe listen --latest`** so forwarded events match the **stripe-go** API version. Without **`--latest`**, verification may fail with an API version mismatch (**400**, **`stripe_event_verify_failed`**).
 
-Run **one** local publisher process (**`make publisher-run`**). Full design: [docs/branches/17-kafka-outbox.md](docs/branches/17-kafka-outbox.md) (M9), [docs/branches/18-consumer-completion.md](docs/branches/18-consumer-completion.md) (M10).
+Run **one** local publisher process (**`make publisher-run`**). Full design: [docs/branches/17-kafka-outbox.md](docs/branches/17-kafka-outbox.md) (M9), [docs/branches/18-consumer-completion.md](docs/branches/18-consumer-completion.md) (M10), [docs/branches/19-downstream-http.md](docs/branches/19-downstream-http.md) (M11).
 
 Historical Lambda / queue notes from the parent project live in [docs/PROJECT_KNOWLEDGE.md](docs/PROJECT_KNOWLEDGE.md).
 
@@ -170,7 +174,7 @@ Details and ordering: [PLAN.md](PLAN.md).
 | `infra/terraform/` | IaC for **ECR** + **GitHub OIDC** IAM for CI image push; run Terraform only from this directory. Outputs (role ARN, registry URL) after **`apply`**: see **[docs/branches/10-terraform-ecr-github-oidc.md](docs/branches/10-terraform-ecr-github-oidc.md)**. |
 | `cmd/api` | HTTP service entrypoint for local and container runs. |
 | `cmd/publisher` | Outbox poller — publishes pending rows to Kafka (**Milestone 9**). |
-| `cmd/worker` | Kafka consumer — claims completion, stub **`handleJob`**, writes **`consumer_completions`** before offset commit (**Milestone 10**). |
+| `cmd/worker` | Kafka consumer — claims completion, POSTs to **`DOWNSTREAM_URL`**, writes **`consumer_completions`**, offset rules for retryable vs permanent failures (**Milestones 10–11**). |
 | `internal/` | Shared packages (config, engine, dbg, etc.). |
 | `testdata/` | Stripe webhook fixtures. |
 | `k8s/` | **Milestone 4** manifests (**`deployment.yaml`**, **`service.yaml`**); cluster Secrets via **`kubectl`** (see **[docs/branches/12-k8s-first-deploy.md](docs/branches/12-k8s-first-deploy.md)**). |

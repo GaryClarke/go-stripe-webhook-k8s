@@ -50,7 +50,7 @@ Each milestone lists **what to learn**, **what changes in the repo**, and **how 
 
 **Do not suggest as the default next step:** **`make lab-on`**, new ROSA deploy work, MSK Terraform, or multi-env AWS promotion unless the user explicitly resumes the cloud track.
 
-**Current focus:** **Milestone 11** — downstream HTTP in **`handleJob`**, failure classification, offset rules. See **[docs/branches/19-downstream-http.md](docs/branches/19-downstream-http.md)**. **Cloud track paused** — see **Active learning track** above.
+**Current focus:** **Milestone 11 complete on branch `19-downstream-http`** (pending merge to **`main`**). Next **local** options: **M12** retry policy (max attempts, backoff), **M13** DLQ, outbox **`failed`** retry. See **[docs/branches/19-downstream-http.md](docs/branches/19-downstream-http.md)** follow-ups. **Cloud track paused** — see **Active learning track** above.
 
 ---
 
@@ -290,7 +290,7 @@ You do not need a full cluster-distributed Kafka on day one; **Redpanda** in Com
 
 **Branch (suggested):** **`19-downstream-http`** — see **[docs/branches/19-downstream-http.md](docs/branches/19-downstream-http.md)**.
 
-**Milestone 11 status:** **Not started** — branch doc locked; implementation next.
+**Milestone 11 status:** **Complete on branch `19-downstream-http`** — merge to **`main`** pending. Tests cover 2xx, 503, 400, duplicate-no-HTTP; README updated.
 
 ---
 

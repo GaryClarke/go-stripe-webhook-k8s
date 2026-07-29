@@ -33,7 +33,7 @@ Add a row when you open or complete a branch.
 | `16-idempotency-postgres` | [16-idempotency-postgres.md](16-idempotency-postgres.md) | **Milestone 8** (done): Postgres **`processed_events`**, RDS, in-cluster Goose, **`replicas: 2`**, cross-Pod dedupe |
 | `17-kafka-outbox` | [17-kafka-outbox.md](17-kafka-outbox.md) | **Milestone 9** (done): Redpanda locally, transactional **outbox**, **`accepted`** ledger, publisher + **`cmd/worker`** |
 | `18-consumer-completion` | [18-consumer-completion.md](18-consumer-completion.md) | **Milestone 10** (done on **`main`**): **`consumer_completions`** table, idempotent worker, offset after DB — **local only** |
-| `19-downstream-http` | [19-downstream-http.md](19-downstream-http.md) | **Milestone 11** (next): real downstream **HTTP** in **`handleJob`**, retryable vs permanent failures, offset rules — **local only** |
+| `19-downstream-http` | [19-downstream-http.md](19-downstream-http.md) | **Milestone 11** (done on branch): downstream **HTTP** in **`handleJob`**, retryable vs permanent failures, offset rules — **local only** |
 
 **Doc template:** mirror the style in [original-branches](../original-branches/README.md): goal, scope, key files, how to verify, follow-ups.
 

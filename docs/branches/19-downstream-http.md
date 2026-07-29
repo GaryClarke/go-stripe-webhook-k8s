@@ -4,7 +4,7 @@
 
 **Git branch:** `19-downstream-http`
 
-**Status:** **Not started** — decisions locked; implementation pending.
+**Status:** **Complete on branch** — config, HTTP client, offset rules, tests; README updated. Merge to **`main`** pending.
 
 **Prerequisite:** **Milestone 10** complete on **`main`** (**`consumer_completions`**, idempotent worker, offset after DB).
 
@@ -185,12 +185,12 @@ Implement via a small **`JobError`** (or similar) with **`Retryable() bool`** re
 
 ## Verify checklist
 
-- [ ] Phase 0: Outcome matrix + permanent-failure-commits-offset locked
-- [ ] Phase 1: **`DOWNSTREAM_URL`** + **`DownstreamClient`**
-- [ ] Phase 2: **`handleJob`** HTTP + classification
-- [ ] Phase 3: **`handleRecord`** offset rules
-- [ ] Phase 4: Unit tests (2xx, 503, 400, duplicate no HTTP)
-- [ ] Phase 5: README + PLAN M11
+- [x] Phase 0: Outcome matrix + permanent-failure-commits-offset locked
+- [x] Phase 1: **`DOWNSTREAM_URL`** + **`DownstreamClient`**
+- [x] Phase 2: **`handleJob`** HTTP + classification
+- [x] Phase 3: **`handleRecord`** offset rules
+- [x] Phase 4: Unit tests (2xx, 503, 400, duplicate no HTTP)
+- [x] Phase 5: README + PLAN M11
 
 ---
 
