@@ -77,9 +77,10 @@ func main() {
 
 				var committed []*kgo.Record
 				for _, rec := range p.Records {
-					if handleRecord(ctx, logger, st, downstream, cfg.KafkaGroupID, rec) {
-						committed = append(committed, rec)
+					if !handleRecord(ctx, logger, st, downstream, cfg.KafkaGroupID, rec) {
+						break
 					}
+					committed = append(committed, rec)
 				}
 
 				if len(committed) > 0 {
