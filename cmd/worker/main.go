@@ -75,13 +75,9 @@ func main() {
 					return
 				}
 
-				var committed []*kgo.Record
-				for _, rec := range p.Records {
-					if !handleRecord(ctx, logger, st, downstream, cfg.KafkaGroupID, rec) {
-						break
-					}
-					committed = append(committed, rec)
-				}
+				committed := recordsSafeToCommit(p.Records, func(rec *kgo.Record) bool {
+					return handleRecord(ctx, logger, st, downstream, cfg.KafkaGroupID, rec)
+				})
 
 				if len(committed) > 0 {
 					if err := client.CommitRecords(ctx, committed...); err != nil {
